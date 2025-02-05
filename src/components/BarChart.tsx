@@ -23,10 +23,13 @@ export const BarChart = ({
   dateRange 
 }: BarChartProps) => {
   console.log('BarChart received data:', data);
+  console.log('Date range:', dateRange);
   
   // Format revenue values to billions or millions
   const formattedData = data.map(item => {
     const revenue = Number(item.revenue);
+    console.log('Processing revenue:', revenue, typeof revenue);
+    
     // Use billions if revenue is over 1B, otherwise use millions
     const divisor = revenue >= 1000000000 ? 1000000000 : 1000000;
     const unitLabel = revenue >= 1000000000 ? 'B' : 'M';
@@ -40,6 +43,9 @@ export const BarChart = ({
     console.log('Formatted revenue item:', formatted);
     return formatted;
   });
+
+  console.log('Final formatted data:', formattedData);
+  console.log('X-axis domain:', dateRange ? [dateRange.start.getTime(), dateRange.end.getTime()] : ['auto', 'auto']);
 
   return (
     <Card className="p-4">
