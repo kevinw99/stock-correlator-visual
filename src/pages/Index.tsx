@@ -1,23 +1,54 @@
 import { useState } from "react";
 import { StockChart } from "@/components/StockChart";
 import { StockSearch } from "@/components/StockSearch";
-
-// Mock data - in a real app this would come from an API
-const mockData = [
-  { date: "2024-01-01", price: 240, revenue: 25.17, margin: 18.2 },
-  { date: "2024-01-02", price: 245, revenue: 25.87, margin: 18.5 },
-  { date: "2024-01-03", price: 238, revenue: 26.12, margin: 18.1 },
-  { date: "2024-01-04", price: 242, revenue: 26.45, margin: 18.7 },
-  { date: "2024-01-05", price: 250, revenue: 26.89, margin: 19.2 },
-].map(d => ({ ...d, date: new Date(d.date).getTime() }));
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const [currentSymbol, setCurrentSymbol] = useState<string | null>(null);
 
+  const { data: stockData, isLoading, error } = useQuery({
+    queryKey: ['stockData', currentSymbol],
+    queryFn: async () => {
+      if (!currentSymbol) return null;
+
+      // First, try to fetch from Supabase
+      const { data: existingData, error: dbError } = await supabase
+        .from('stock_data')
+        .select('*')
+        .eq('symbol', currentSymbol)
+        .order('date', { ascending: true });
+
+      if (dbError) throw dbError;
+
+      // If we have recent data (less than a day old), use it
+      if (existingData && existingData.length > 0) {
+        const latestDate = new Date(existingData[existingData.length - 1].date);
+        const isRecent = (Date.now() - latestDate.getTime()) < 24 * 60 * 60 * 1000;
+        
+        if (isRecent) {
+          console.log('Using cached data from Supabase');
+          return existingData;
+        }
+      }
+
+      // If no recent data, fetch from API
+      console.log('Fetching fresh data from API');
+      const response = await supabase.functions.invoke('fetchStockData', {
+        body: { symbol: currentSymbol }
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      return response.data;
+    },
+    enabled: !!currentSymbol
+  });
+
   const handleSearch = (symbol: string) => {
     console.log("Searching for symbol:", symbol);
     setCurrentSymbol(symbol);
-    // In a real app, this would fetch data from an API
   };
 
   return (
@@ -28,25 +59,39 @@ const Index = () => {
           <StockSearch onSearch={handleSearch} />
         </div>
 
-        {currentSymbol && (
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          </div>
+        )}
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              {error instanceof Error ? error.message : 'An error occurred while fetching data'}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {currentSymbol && stockData && (
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold mb-4">{currentSymbol} Analysis</h2>
             <div className="space-y-6">
               <StockChart
-                data={mockData}
+                data={stockData}
                 title="Stock Price"
                 dataKey="price"
                 height={400}
               />
               <div className="grid md:grid-cols-2 gap-6">
                 <StockChart
-                  data={mockData}
+                  data={stockData}
                   title="Quarterly Revenue"
                   dataKey="revenue"
                   color="#0891b2"
                 />
                 <StockChart
-                  data={mockData}
+                  data={stockData}
                   title="Profit Margin"
                   dataKey="margin"
                   color="#059669"
