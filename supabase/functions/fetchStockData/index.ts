@@ -33,8 +33,8 @@ serve(async (req) => {
     const formattedSymbol = symbol.trim().toUpperCase();
     console.log(`Processing request for symbol: ${formattedSymbol}`);
 
-    // Fetch price data
-    const startDate = getDateYearsAgo(5);
+    // Fetch price data - now fetching 10 years of data
+    const startDate = getDateYearsAgo(10);
     const priceUrl = `https://api.tiingo.com/tiingo/daily/${formattedSymbol}/prices?startDate=${startDate}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching price data from URL: ${priceUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
     
@@ -53,8 +53,8 @@ serve(async (req) => {
       throw new Error(`No price data available for ${formattedSymbol}`);
     }
 
-    // Fetch fundamentals data
-    const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?token=${TIINGO_API_KEY}`;
+    // Fetch fundamentals data - using startDate parameter for longer history
+    const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?startDate=${startDate}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching fundamentals data from URL: ${fundamentalsUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
     
     const fundamentalsResponse = await fetch(fundamentalsUrl);
@@ -64,11 +64,12 @@ serve(async (req) => {
     
     if (fundamentalsResponse.ok) {
       const rawFundamentals = await fundamentalsResponse.json();
-      console.log('Raw fundamentals first record:', {
-        date: rawFundamentals[0]?.date,
-        hasStatementData: !!rawFundamentals[0]?.statementData,
-        hasIncomeStatement: !!rawFundamentals[0]?.statementData?.incomeStatement,
-        hasOverview: !!rawFundamentals[0]?.statementData?.overview
+      console.log('Raw fundamentals summary:', {
+        totalRecords: rawFundamentals.length,
+        dateRange: {
+          start: rawFundamentals[0]?.date,
+          end: rawFundamentals[rawFundamentals.length - 1]?.date
+        }
       });
       
       // Process fundamentals data with the correct structure
