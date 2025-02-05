@@ -21,13 +21,13 @@ serve(async (req) => {
       throw new Error('FMP_API_KEY not configured');
     }
 
-    // Fetch historical price data
-    const priceUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${symbol}?apikey=${FMP_API_KEY}`;
+    // Fetch 5 years of historical price data
+    const priceUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${symbol}?from=${getDateYearsAgo(5)}&apikey=${FMP_API_KEY}`;
     const priceResponse = await fetch(priceUrl);
     const priceData = await priceResponse.json();
 
     // Fetch income statements for revenue and margin data
-    const incomeUrl = `https://financialmodelingprep.com/api/v3/income-statement/${symbol}?limit=4&apikey=${FMP_API_KEY}`;
+    const incomeUrl = `https://financialmodelingprep.com/api/v3/income-statement/${symbol}?limit=20&apikey=${FMP_API_KEY}`;
     const incomeResponse = await fetch(incomeUrl);
     const incomeData = await incomeResponse.json();
 
@@ -37,7 +37,6 @@ serve(async (req) => {
 
     // Process and combine the data
     const processedData = priceData.historical
-      .slice(0, 30) // Last 30 days of price data
       .map((price: any) => {
         const date = new Date(price.date).getTime();
         return {
@@ -90,3 +89,10 @@ serve(async (req) => {
     });
   }
 });
+
+// Helper function to get date from X years ago
+function getDateYearsAgo(years: number): string {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - years);
+  return date.toISOString().split('T')[0];
+}
