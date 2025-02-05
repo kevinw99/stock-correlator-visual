@@ -25,10 +25,10 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
 
   console.log('Price data range:', priceDataRange);
 
-  // Format quarterly data and get its date range
-  const formattedQuarterlyData = data.fundamentalData
+  // Process quarterly data
+  const quarterlyData = data.fundamentalData
     .filter(item => {
-      const hasRevenue = item.revenue != null;
+      const hasRevenue = item.revenue != null && !isNaN(Number(item.revenue));
       const hasQuarter = item.quarter != null;
       const hasYear = item.fiscal_year != null;
       const hasDate = item.date != null;
@@ -37,15 +37,15 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
     .map(item => ({
       ...item,
       revenue: Number(item.revenue),
-      date: new Date(item.announcement_date || item.date)
+      date: new Date(item.date)
     }))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  console.log('Formatted quarterly data:', formattedQuarterlyData);
+  console.log('Processed quarterly data:', quarterlyData);
 
-  const quarterlyDataRange = formattedQuarterlyData.length > 0 ? {
-    start: new Date(Math.min(...formattedQuarterlyData.map(d => d.date.getTime()))),
-    end: new Date(Math.max(...formattedQuarterlyData.map(d => d.date.getTime())))
+  const quarterlyDataRange = quarterlyData.length > 0 ? {
+    start: new Date(Math.min(...quarterlyData.map(d => d.date.getTime()))),
+    end: new Date(Math.max(...quarterlyData.map(d => d.date.getTime())))
   } : null;
 
   console.log('Quarterly data range:', quarterlyDataRange);
@@ -73,20 +73,22 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
           dataKey="price"
           height={400}
           color="#0891b2"
-          announcementDates={formattedQuarterlyData.map(d => d.date.toISOString())}
+          announcementDates={quarterlyData.map(d => d.date.toISOString())}
           dateRange={priceDataRange}
           globalDateRange={globalDateRange}
         />
       )}
-      <BarChart
-        data={formattedQuarterlyData}
-        title={`Quarterly Revenue for ${symbol}`}
-        dataKey="revenue"
-        height={400}
-        color="#0891b2"
-        dateRange={quarterlyDataRange}
-        globalDateRange={globalDateRange}
-      />
+      {quarterlyData.length > 0 && (
+        <BarChart
+          data={quarterlyData}
+          title={`Quarterly Revenue for ${symbol}`}
+          dataKey="revenue"
+          height={400}
+          color="#0891b2"
+          dateRange={quarterlyDataRange}
+          globalDateRange={globalDateRange}
+        />
+      )}
     </div>
   );
 };
