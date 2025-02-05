@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       fundamental_data: {
         Row: {
+          announcement_date: string | null
           created_at: string | null
           date: string
           gross_margin: number | null
@@ -20,6 +21,7 @@ export type Database = {
           symbol: string
         }
         Insert: {
+          announcement_date?: string | null
           created_at?: string | null
           date: string
           gross_margin?: number | null
@@ -29,6 +31,7 @@ export type Database = {
           symbol: string
         }
         Update: {
+          announcement_date?: string | null
           created_at?: string | null
           date?: string
           gross_margin?: number | null
