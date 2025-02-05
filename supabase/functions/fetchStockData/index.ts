@@ -75,7 +75,8 @@ serve(async (req) => {
         date: priceDate,
         price: pricePoint.adjClose || pricePoint.close,
         revenue: fundamentals?.quarterlyRevenue || null,
-        margin: fundamentals?.grossMargin ? parseFloat(fundamentals.grossMargin) * 100 : null
+        margin: fundamentals?.grossMargin ? parseFloat(fundamentals.grossMargin) * 100 : null,
+        symbol: formattedSymbol
       };
     });
 
@@ -84,7 +85,7 @@ serve(async (req) => {
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // 存储到 Supabase
+    // 存储到 Supabase，使用 upsert 操作
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -93,12 +94,10 @@ serve(async (req) => {
 
     const { error: insertError } = await supabaseClient
       .from('stock_data')
-      .upsert(
-        sortedData.map(record => ({
-          symbol: formattedSymbol,
-          ...record
-        }))
-      );
+      .upsert(sortedData, {
+        onConflict: 'symbol,date',
+        ignoreDuplicates: false
+      });
 
     if (insertError) {
       console.error('Error inserting data into Supabase:', insertError);
