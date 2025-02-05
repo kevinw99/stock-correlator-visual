@@ -34,11 +34,14 @@ const Index = () => {
       if (!currentSymbol) return null;
       console.log('Fetching data for symbol:', currentSymbol, 'at timestamp:', searchTimestamp);
 
-      // Get ALL price data without any limit
+      // Get weekly price data using SQL query
       const { data: priceData, error: priceError } = await supabase
         .from('stock_data')
         .select('*')
         .eq('symbol', currentSymbol)
+        .filter('date', 'gte', '2015-01-01')
+        .filter('date', 'lte', '2025-12-31')
+        .or('date.eq.date_trunc(\'week\', date)')  // Get only the first day of each week
         .order('date', { ascending: true });
 
       if (priceError) throw priceError;
@@ -48,7 +51,8 @@ const Index = () => {
         console.log('Price data range:', {
           first: priceData[0].date,
           last: priceData[priceData.length - 1].date,
-          total: priceData.length
+          total: priceData.length,
+          samplePoints: priceData.slice(0, 3)
         });
       }
 
