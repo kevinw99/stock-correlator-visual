@@ -44,7 +44,7 @@ const Index = () => {
       if (priceError) throw priceError;
       console.log('Existing price data:', existingPriceData);
 
-      // Always fetch fresh fundamental data from API
+      // Fetch and store fresh fundamental data via Edge Function
       console.log('Fetching fresh fundamental data from API');
       const response = await supabase.functions.invoke('fetchStockData', {
         body: { symbol: currentSymbol }
@@ -53,7 +53,7 @@ const Index = () => {
       if (response.error) throw new Error(response.error.message);
       console.log('API Response:', response);
       
-      // Combine existing price data with fresh fundamental data
+      // Combine existing price data with fundamental data from database
       const combinedData = {
         fundamentalData: response.data.fundamentalData || [],
         priceData: existingPriceData || []

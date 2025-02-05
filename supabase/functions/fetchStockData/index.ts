@@ -57,7 +57,7 @@ serve(async (req) => {
         const quarter = item.quarter;
         const year = item.year;
 
-        console.log('Raw statement data:', {
+        console.log('Processing statement data:', {
           date: item.date,
           quarter: quarter,
           year: year
@@ -119,10 +119,22 @@ serve(async (req) => {
       }
     }
 
-    // Return the response with both the raw API data and stored data
+    // Fetch the stored data from database
+    const { data: fundamentalData, error: fetchError } = await supabaseClient
+      .from('fundamental_data')
+      .select('*')
+      .eq('symbol', formattedSymbol)
+      .order('date', { ascending: true });
+
+    if (fetchError) {
+      console.error('Error fetching stored data:', fetchError);
+      throw new Error('Failed to fetch stored data');
+    }
+
+    // Return the database data
     return new Response(JSON.stringify({
-      fundamentalData: fundamentalsData,
-      message: 'Data processed successfully'
+      fundamentalData,
+      message: 'Data processed and retrieved successfully'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
