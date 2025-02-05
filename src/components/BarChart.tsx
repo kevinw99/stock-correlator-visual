@@ -16,10 +16,10 @@ export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb"
   const formattedData = data.map(item => {
     const formatted = {
       ...item,
-      revenue: item.revenue ? Number((item.revenue / 1000000000).toFixed(2)) : null,
-      label: `Q${item.quarter} ${item.fiscal_year}`
+      revenue: Number(item.revenue) ? Number((Number(item.revenue) / 1000000000).toFixed(2)) : null,
+      label: item.label
     };
-    console.log('Formatted item:', formatted);
+    console.log('Formatted chart item:', formatted);
     return formatted;
   });
 

@@ -10,7 +10,6 @@ interface FundamentalChartsProps {
 
 export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
   console.log('Raw data received in FundamentalCharts:', data);
-  console.log('Symbol:', symbol);
 
   // Check if fundamentalData exists and is an array
   if (!data.fundamentalData || !Array.isArray(data.fundamentalData)) {
@@ -22,7 +21,7 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
   const quarterlyData = data.fundamentalData
     .filter(item => {
       console.log('Processing item:', item);
-      const hasRevenue = item.revenue != null && item.revenue !== 0;
+      const hasRevenue = item.revenue != null;
       const hasQuarter = item.quarter != null;
       const hasYear = item.fiscal_year != null;
       
@@ -37,11 +36,6 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
 
       return hasRevenue && hasQuarter && hasYear;
     })
-    .map(item => ({
-      ...item,
-      // Convert revenue to billions for display
-      revenue: Number((item.revenue / 1000000000).toFixed(2))
-    }))
     .sort((a, b) => {
       // Sort by fiscal year and quarter
       if (a.fiscal_year !== b.fiscal_year) {
@@ -56,8 +50,11 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
   // Format data for display
   const formattedData = quarterlyData.map(item => ({
     ...item,
-    label: `Q${item.quarter} ${item.fiscal_year}`
+    label: `Q${item.quarter} ${item.fiscal_year}`,
+    revenue: Number(item.revenue) // Ensure revenue is a number
   }));
+
+  console.log('Final formatted data:', formattedData);
 
   return (
     <div className="space-y-6">
