@@ -1,7 +1,10 @@
 import { BarChart } from './BarChart';
 
 interface FundamentalChartsProps {
-  data: any[];
+  data: {
+    fundamentalData?: any[];
+    priceData?: any[];
+  };
   symbol: string;
 }
 
@@ -9,8 +12,14 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
   console.log('Raw data received in FundamentalCharts:', data);
   console.log('Symbol:', symbol);
 
+  // Check if fundamentalData exists and is an array
+  if (!data.fundamentalData || !Array.isArray(data.fundamentalData)) {
+    console.log('No fundamental data available or invalid format');
+    return null;
+  }
+
   // Filter and sort data
-  const quarterlyData = data
+  const quarterlyData = data.fundamentalData
     .filter(item => {
       console.log('Processing item:', item);
       const hasRevenue = item.revenue != null && item.revenue !== 0;

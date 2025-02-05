@@ -54,7 +54,7 @@ const Index = () => {
       
       // Combine existing price data with fresh fundamental data
       const combinedData = {
-        ...response.data,
+        fundamentalData: response.data.fundamentalData || [],
         priceData: existingPriceData || []
       };
       
