@@ -1,10 +1,15 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
+
+function getDateYearsAgo(years: number): string {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - years);
+  return date.toISOString().split('T')[0];
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -13,123 +18,121 @@ serve(async (req) => {
   }
 
   try {
-    const { symbol } = await req.json();
-    console.log('Fetching data for symbol:', symbol);
+    const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
+    if (!FMP_API_KEY) {
+      console.error('FMP_API_KEY not found in environment variables');
+      throw new Error('API key configuration error');
+    }
 
+    const { symbol } = await req.json();
     if (!symbol) {
+      console.error('No symbol provided in request');
       throw new Error('Symbol is required');
     }
 
-    const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
-    if (!FMP_API_KEY) {
-      throw new Error('FMP_API_KEY not configured');
-    }
+    console.log(`Processing request for symbol: ${symbol}`);
 
     // Fetch 5 years of historical price data
     const priceUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${symbol}?from=${getDateYearsAgo(5)}&apikey=${FMP_API_KEY}`;
-    console.log('Attempting to fetch price data...');
+    console.log(`Fetching price data for ${symbol}...`);
     const priceResponse = await fetch(priceUrl);
     
     if (!priceResponse.ok) {
-      console.error('Price API response not OK:', priceResponse.status, await priceResponse.text());
+      console.error(`Price API error for ${symbol}:`, priceResponse.status, await priceResponse.text());
       throw new Error(`Failed to fetch price data: ${priceResponse.status}`);
     }
     
     const priceData = await priceResponse.json();
-    console.log('Price data received:', priceData ? 'yes' : 'no', 'Historical data:', priceData.historical ? priceData.historical.length : 0);
+    console.log(`Price data for ${symbol}:`, {
+      received: !!priceData,
+      hasHistorical: !!priceData.historical,
+      dataPoints: priceData.historical?.length || 0
+    });
 
-    // Check if price data is valid
     if (!priceData.historical || priceData.historical.length === 0) {
-      console.error('No price data found for symbol:', symbol);
-      throw new Error(`No price data available for symbol: ${symbol}`);
+      console.error(`No historical price data found for ${symbol}`);
+      throw new Error(`No price data available for ${symbol}`);
     }
 
     // Fetch quarterly income statements for revenue data
     const incomeUrl = `https://financialmodelingprep.com/api/v3/income-statement/${symbol}?period=quarter&limit=20&apikey=${FMP_API_KEY}`;
-    console.log('Attempting to fetch income data...');
+    console.log(`Fetching income data for ${symbol}...`);
     const incomeResponse = await fetch(incomeUrl);
     
     if (!incomeResponse.ok) {
-      console.error('Income API response not OK:', incomeResponse.status, await incomeResponse.text());
+      console.error(`Income API error for ${symbol}:`, incomeResponse.status, await incomeResponse.text());
       throw new Error(`Failed to fetch income data: ${incomeResponse.status}`);
     }
     
     const incomeData = await incomeResponse.json();
-    console.log('Income data received:', incomeData ? 'yes' : 'no', 'Records:', Array.isArray(incomeData) ? incomeData.length : 0);
+    console.log(`Income data for ${symbol}:`, {
+      received: !!incomeData,
+      isArray: Array.isArray(incomeData),
+      records: Array.isArray(incomeData) ? incomeData.length : 0
+    });
 
-    // Check if income data is valid
     if (!Array.isArray(incomeData) || incomeData.length === 0) {
-      console.error('No income data found for symbol:', symbol);
-      throw new Error(`No income data available for symbol: ${symbol}`);
+      console.error(`No income statement data found for ${symbol}`);
+      throw new Error(`No financial data available for ${symbol}`);
     }
 
     // Process and combine the data
-    const processedData = priceData.historical
-      .map((price: any) => {
-        const date = new Date(price.date).getTime();
-        // Find matching quarterly data
-        const quarterData = incomeData.find((q: any) => {
-          const qDate = new Date(q.date).getTime();
-          return Math.abs(date - qDate) < 24 * 60 * 60 * 1000; // Within 1 day
-        });
+    const combinedData = priceData.historical.map((pricePoint: any) => {
+      const date = pricePoint.date;
+      const matchingIncome = incomeData.find((income: any) => {
+        const incomeDate = income.date.split(' ')[0];
+        return incomeDate === date;
+      });
 
-        return {
-          date,
-          price: price.close,
-          revenue: quarterData?.revenue || null,
-        };
-      })
-      .reverse(); // Reverse to get chronological order
+      return {
+        date: date,
+        price: pricePoint.close,
+        revenue: matchingIncome?.revenue || null,
+        margin: matchingIncome ? (matchingIncome.grossProfit / matchingIncome.revenue) * 100 : null
+      };
+    });
 
-    // Store data in Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase configuration missing');
+    // Sort data by date in ascending order
+    const sortedData = combinedData.sort((a: any, b: any) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    console.log(`Successfully processed data for ${symbol}. Total records: ${sortedData.length}`);
+
+    // Store the data in Supabase
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { db: { schema: 'public' } }
+    );
+
+    // Insert the data into the stock_data table
+    const { error: insertError } = await supabaseClient
+      .from('stock_data')
+      .upsert(
+        sortedData.map(record => ({
+          symbol: symbol,
+          ...record
+        }))
+      );
+
+    if (insertError) {
+      console.error('Error inserting data into Supabase:', insertError);
+      throw new Error('Failed to store data');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    console.log('Storing data for symbol:', symbol);
-
-    // Insert data into the database
-    for (const data of processedData) {
-      const { error } = await supabase
-        .from('stock_data')
-        .upsert({
-          symbol,
-          date: new Date(data.date).toISOString(),
-          price: data.price,
-          revenue: data.revenue,
-        }, {
-          onConflict: 'symbol,date'
-        });
-      
-      if (error) {
-        console.error('Error inserting data:', error);
-      }
-    }
-
-    console.log('Successfully processed and stored data for:', symbol);
-    return new Response(JSON.stringify(processedData), {
+    return new Response(JSON.stringify(sortedData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+
   } catch (error) {
-    console.error('Error in fetchStockData:', error.message);
-    return new Response(
-      JSON.stringify({ 
+    console.error('Error processing request:', error.message);
+    return new Response(JSON.stringify({
         error: error.message,
         details: 'Please ensure the stock symbol is valid and try again.'
       }), {
-      status: 400, // Using 400 for invalid input rather than 500
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
-
-// Helper function to get date from X years ago
-function getDateYearsAgo(years: number): string {
-  const date = new Date();
-  date.setFullYear(date.getFullYear() - years);
-  return date.toISOString().split('T')[0];
-}
+})
