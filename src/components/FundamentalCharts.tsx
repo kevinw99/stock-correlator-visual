@@ -10,6 +10,7 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
   const calculateTTM = (data: any[]) => {
     return data.map((item, index, arr) => {
       if (index < 3) return { ...item, ttmRevenue: null };
+      // Sum up the revenue for the current quarter and previous 3 quarters
       const ttmRevenue = arr
         .slice(index - 3, index + 1)
         .reduce((sum, curr) => sum + (curr.revenue || 0), 0);
@@ -28,9 +29,25 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
     });
   };
 
-  // Filter out entries without revenue data
-  const dataWithRevenue = data.filter(item => item.revenue != null);
+  // Filter out entries without revenue data and sort by date
+  const dataWithRevenue = data
+    .filter(item => item.revenue != null)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  console.log('Filtered revenue data:', dataWithRevenue.map(d => ({
+    date: d.date,
+    revenue: d.revenue
+  })));
+
+  // Apply calculations
   const dataWithCalculations = calculateYoYGrowth(calculateTTM(dataWithRevenue));
+
+  console.log('Data with calculations:', dataWithCalculations.map(d => ({
+    date: d.date,
+    revenue: d.revenue,
+    ttmRevenue: d.ttmRevenue,
+    yoyGrowth: d.yoyGrowth
+  })));
 
   return (
     <div className="space-y-6">
