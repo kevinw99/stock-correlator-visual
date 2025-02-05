@@ -12,6 +12,22 @@ const Index = () => {
   // Add a timestamp to force refresh when the same symbol is searched
   const [searchTimestamp, setSearchTimestamp] = useState<number>(Date.now());
 
+  // Add a query to check fundamental data
+  const { data: fundamentalCheck } = useQuery({
+    queryKey: ['fundamentalCheck'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('stock_data')
+        .select('symbol, revenue, margin')
+        .not('revenue', 'is', null)
+        .limit(5);
+
+      if (error) throw error;
+      console.log('Sample of fundamental data:', data);
+      return data;
+    }
+  });
+
   const { data: stockData, isLoading, error } = useQuery({
     queryKey: ['stockData', currentSymbol, searchTimestamp],
     queryFn: async () => {
@@ -50,7 +66,6 @@ const Index = () => {
   const handleSearch = (symbol: string) => {
     console.log("Searching for symbol:", symbol);
     setCurrentSymbol(symbol);
-    // Update timestamp to force a refresh even if the symbol is the same
     setSearchTimestamp(Date.now());
   };
 
@@ -61,6 +76,16 @@ const Index = () => {
           <h1 className="text-2xl font-bold text-gray-900">Stock Analysis Dashboard</h1>
           <StockSearch onSearch={handleSearch} />
         </div>
+
+        {/* Add fundamental data check */}
+        {fundamentalCheck && fundamentalCheck.length > 0 && (
+          <Alert>
+            <AlertDescription>
+              Found {fundamentalCheck.length} stocks with fundamental data. 
+              Sample: {fundamentalCheck.map(d => d.symbol).join(', ')}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {isLoading && (
           <div className="flex items-center justify-center py-12">
