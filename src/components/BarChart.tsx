@@ -10,12 +10,20 @@ interface BarChartProps {
 }
 
 export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb" }: BarChartProps) => {
+  console.log('BarChart received data:', data);
+  
   // Format revenue values to billions
-  const formattedData = data.map(item => ({
-    ...item,
-    revenue: item.revenue ? Number((item.revenue / 1000000000).toFixed(2)) : null,
-    reportType: `Q${item.quarter} ${item.fiscal_year}`
-  }));
+  const formattedData = data.map(item => {
+    const formatted = {
+      ...item,
+      revenue: item.revenue ? Number((item.revenue / 1000000000).toFixed(2)) : null,
+      reportType: `Q${item.quarter} ${item.fiscal_year}`
+    };
+    console.log('Formatted item:', formatted);
+    return formatted;
+  });
+
+  console.log('Final formatted data:', formattedData);
 
   return (
     <Card className="p-4">
