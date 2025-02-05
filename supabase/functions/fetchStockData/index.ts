@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const FMP_API_KEY = Deno.env.get('FMP_API_KEY')
+const TIINGO_API_KEY = Deno.env.get('TIINGO_API_KEY')
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -26,8 +26,8 @@ serve(async (req) => {
       )
     }
 
-    if (!FMP_API_KEY) {
-      console.error('FMP_API_KEY is not set')
+    if (!TIINGO_API_KEY) {
+      console.error('TIINGO_API_KEY is not set')
       return new Response(
         JSON.stringify({ error: 'API configuration error' }),
         { 
@@ -39,18 +39,32 @@ serve(async (req) => {
 
     console.log(`Fetching fundamental data for symbol: ${symbol}`)
     
-    const fundamentalUrl = `https://financialmodelingprep.com/api/v3/income-statement/${symbol}?period=quarter&limit=20&apikey=${FMP_API_KEY}`
+    // Fetch quarterly statements from Tiingo
+    const fundamentalUrl = `https://api.tiingo.com/tiingo/fundamentals/${symbol}/statements?token=${TIINGO_API_KEY}`
     
     const response = await fetch(fundamentalUrl)
     
     if (!response.ok) {
-      console.error(`FMP API error: ${response.status} ${response.statusText}`)
+      console.error(`Tiingo API error: ${response.status} ${response.statusText}`)
       const errorText = await response.text()
       console.error(`Error details: ${errorText}`)
       throw new Error(`Failed to fetch fundamental data: ${response.statusText}`)
     }
 
-    const fundamentalData = await response.json()
+    const rawData = await response.json()
+    
+    // Transform Tiingo data format to match our existing structure
+    const fundamentalData = rawData.map((statement: any) => ({
+      symbol: symbol,
+      date: statement.date,
+      announcement_date: statement.date, // Tiingo doesn't provide announcement date
+      revenue: statement.totalRevenue,
+      gross_profit: statement.grossProfit,
+      gross_margin: statement.grossProfit / statement.totalRevenue * 100,
+      quarter: new Date(statement.date).getMonth() / 3 + 1,
+      fiscal_year: new Date(statement.date).getFullYear()
+    }));
+
     console.log(`Received ${fundamentalData.length} quarters of fundamental data`)
 
     return new Response(
