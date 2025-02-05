@@ -26,8 +26,8 @@ serve(async (req) => {
     const priceResponse = await fetch(priceUrl);
     const priceData = await priceResponse.json();
 
-    // Fetch income statements for revenue and margin data
-    const incomeUrl = `https://financialmodelingprep.com/api/v3/income-statement/${symbol}?limit=20&apikey=${FMP_API_KEY}`;
+    // Fetch quarterly income statements for revenue data
+    const incomeUrl = `https://financialmodelingprep.com/api/v3/income-statement/${symbol}?period=quarter&limit=20&apikey=${FMP_API_KEY}`;
     const incomeResponse = await fetch(incomeUrl);
     const incomeData = await incomeResponse.json();
 
@@ -39,15 +39,19 @@ serve(async (req) => {
     const processedData = priceData.historical
       .map((price: any) => {
         const date = new Date(price.date).getTime();
+        // Find matching quarterly data
+        const quarterData = incomeData.find((q: any) => {
+          const qDate = new Date(q.date).getTime();
+          return Math.abs(date - qDate) < 24 * 60 * 60 * 1000; // Within 1 day
+        });
+
         return {
           date,
           price: price.close,
-          // Find matching quarterly data if available
-          revenue: null,
-          margin: null
+          revenue: quarterData?.revenue || null,
         };
       })
-      .reverse();
+      .reverse(); // Reverse to get chronological order
 
     // Store data in Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -68,7 +72,6 @@ serve(async (req) => {
           date: new Date(data.date).toISOString(),
           price: data.price,
           revenue: data.revenue,
-          margin: data.margin
         }, {
           onConflict: 'symbol,date'
         });
@@ -78,6 +81,7 @@ serve(async (req) => {
       }
     }
 
+    console.log('Successfully processed and stored data for:', symbol);
     return new Response(JSON.stringify(processedData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
