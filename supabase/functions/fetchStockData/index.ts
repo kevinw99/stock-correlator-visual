@@ -34,7 +34,7 @@ serve(async (req) => {
       { db: { schema: 'public' } }
     );
 
-    // Fetch fundamentals data
+    // Fetch fundamentals data with 10-year history
     const startDate = new Date();
     startDate.setFullYear(startDate.getFullYear() - 10);
     const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?startDate=${startDate.toISOString().split('T')[0]}&token=${TIINGO_API_KEY}`;
@@ -53,6 +53,47 @@ serve(async (req) => {
     if (Array.isArray(fundamentalsData) && fundamentalsData.length > 0) {
       console.log(`Processing ${fundamentalsData.length} fundamental data records for ${formattedSymbol}`);
       
+      // First, fetch price data for 10 years
+      const priceStartDate = new Date();
+      priceStartDate.setFullYear(priceStartDate.getFullYear() - 10);
+      const priceUrl = `https://api.tiingo.com/tiingo/daily/${formattedSymbol}/prices?startDate=${priceStartDate.toISOString().split('T')[0]}&token=${TIINGO_API_KEY}`;
+      console.log(`Fetching price data from URL: ${priceUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
+      
+      const priceResponse = await fetch(priceUrl);
+      if (!priceResponse.ok) {
+        console.error(`Error fetching price data: ${priceResponse.status}`);
+        throw new Error('Failed to fetch price data');
+      }
+      
+      const priceData = await priceResponse.json();
+      console.log(`Received price data for ${formattedSymbol}:`, JSON.stringify(priceData.slice(0, 2)) + '...');
+
+      // Store price data
+      if (Array.isArray(priceData) && priceData.length > 0) {
+        for (const item of priceData) {
+          try {
+            const { error: priceError } = await supabaseClient
+              .from('stock_data')
+              .upsert({
+                symbol: formattedSymbol,
+                date: item.date,
+                price: item.adjClose || item.close,
+              }, {
+                onConflict: 'symbol,date'
+              });
+
+            if (priceError) {
+              console.error(`Error storing price data for ${formattedSymbol}:`, priceError);
+              continue;
+            }
+          } catch (error) {
+            console.error(`Unexpected error storing price data for ${formattedSymbol}:`, error);
+            continue;
+          }
+        }
+      }
+
+      // Process and store fundamental data
       for (const item of fundamentalsData) {
         const quarter = item.quarter;
         const year = item.year;
