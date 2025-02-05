@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,9 +19,9 @@ serve(async (req) => {
   }
 
   try {
-    const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
-    if (!FMP_API_KEY) {
-      console.error('FMP_API_KEY not found in environment variables');
+    const TIINGO_API_KEY = Deno.env.get('TIINGO_API_KEY');
+    if (!TIINGO_API_KEY) {
+      console.error('TIINGO_API_KEY not found in environment variables');
       throw new Error('API key configuration error');
     }
 
@@ -32,8 +33,9 @@ serve(async (req) => {
 
     console.log(`Processing request for symbol: ${symbol}`);
 
-    // Fetch 5 years of historical price data
-    const priceUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${symbol}?from=${getDateYearsAgo(5)}&apikey=${FMP_API_KEY}`;
+    // Fetch daily price data from Tiingo
+    const startDate = getDateYearsAgo(5);
+    const priceUrl = `https://api.tiingo.com/tiingo/daily/${symbol}/prices?startDate=${startDate}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching price data for ${symbol}...`);
     const priceResponse = await fetch(priceUrl);
     
@@ -43,52 +45,43 @@ serve(async (req) => {
     }
     
     const priceData = await priceResponse.json();
-    console.log(`Price data for ${symbol}:`, {
-      received: !!priceData,
-      hasHistorical: !!priceData.historical,
-      dataPoints: priceData.historical?.length || 0
+    console.log(`Price data received for ${symbol}:`, {
+      dataPoints: priceData?.length || 0
     });
 
-    if (!priceData.historical || priceData.historical.length === 0) {
-      console.error(`No historical price data found for ${symbol}`);
+    if (!Array.isArray(priceData) || priceData.length === 0) {
+      console.error(`No price data found for ${symbol}`);
       throw new Error(`No price data available for ${symbol}`);
     }
 
-    // Fetch quarterly income statements for revenue data
-    const incomeUrl = `https://financialmodelingprep.com/api/v3/income-statement/${symbol}?period=quarter&limit=20&apikey=${FMP_API_KEY}`;
-    console.log(`Fetching income data for ${symbol}...`);
-    const incomeResponse = await fetch(incomeUrl);
+    // Fetch fundamentals data from Tiingo
+    const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${symbol}/statements?token=${TIINGO_API_KEY}`;
+    console.log(`Fetching fundamentals data for ${symbol}...`);
+    const fundamentalsResponse = await fetch(fundamentalsUrl);
     
-    if (!incomeResponse.ok) {
-      console.error(`Income API error for ${symbol}:`, incomeResponse.status, await incomeResponse.text());
-      throw new Error(`Failed to fetch income data: ${incomeResponse.status}`);
+    if (!fundamentalsResponse.ok) {
+      console.error(`Fundamentals API error for ${symbol}:`, fundamentalsResponse.status, await fundamentalsResponse.text());
+      throw new Error(`Failed to fetch fundamentals data: ${fundamentalsResponse.status}`);
     }
     
-    const incomeData = await incomeResponse.json();
-    console.log(`Income data for ${symbol}:`, {
-      received: !!incomeData,
-      isArray: Array.isArray(incomeData),
-      records: Array.isArray(incomeData) ? incomeData.length : 0
+    const fundamentalsData = await fundamentalsResponse.json();
+    console.log(`Fundamentals data received for ${symbol}:`, {
+      quarters: fundamentalsData?.length || 0
     });
 
-    if (!Array.isArray(incomeData) || incomeData.length === 0) {
-      console.error(`No income statement data found for ${symbol}`);
-      throw new Error(`No financial data available for ${symbol}`);
-    }
-
     // Process and combine the data
-    const combinedData = priceData.historical.map((pricePoint: any) => {
-      const date = pricePoint.date;
-      const matchingIncome = incomeData.find((income: any) => {
-        const incomeDate = income.date.split(' ')[0];
-        return incomeDate === date;
-      });
+    const combinedData = priceData.map((pricePoint: any) => {
+      const date = pricePoint.date.split('T')[0];
+      const matchingFundamentals = fundamentalsData?.find((f: any) => 
+        f.date.split('T')[0] === date
+      );
 
       return {
         date: date,
-        price: pricePoint.close,
-        revenue: matchingIncome?.revenue || null,
-        margin: matchingIncome ? (matchingIncome.grossProfit / matchingIncome.revenue) * 100 : null
+        price: pricePoint.adjClose || pricePoint.close,
+        revenue: matchingFundamentals?.quarterlyRevenue || null,
+        margin: matchingFundamentals?.grossMargin ? 
+          parseFloat(matchingFundamentals.grossMargin) * 100 : null
       };
     });
 
