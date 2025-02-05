@@ -10,11 +10,17 @@ interface StockChartProps {
 }
 
 export const StockChart = ({ data, title, dataKey, height = 300, color = "#2563eb" }: StockChartProps) => {
+  // Format revenue values to millions
+  const formattedData = data.map(item => ({
+    ...item,
+    revenue: item.revenue ? Number((item.revenue / 1000000).toFixed(2)) : null
+  }));
+
   return (
     <Card className="p-4">
       <h3 className="text-lg font-semibold mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={height}>
-        <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+        <AreaChart data={formattedData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={color} stopOpacity={0.1}/>
@@ -23,14 +29,23 @@ export const StockChart = ({ data, title, dataKey, height = 300, color = "#2563e
           </defs>
           <XAxis 
             dataKey="date" 
-            tickFormatter={(value) => new Date(value).toLocaleDateString()}
+            tickFormatter={(value) => {
+              const date = new Date(value);
+              return `${date.getFullYear()} Q${Math.floor(date.getMonth() / 3) + 1}`;
+            }}
             minTickGap={50}
           />
-          <YAxis />
+          <YAxis 
+            tickFormatter={(value) => `${value.toLocaleString()}`}
+          />
           <CartesianGrid strokeDasharray="3 3" />
           <Tooltip
             contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
-            labelFormatter={(value) => new Date(value).toLocaleDateString()}
+            labelFormatter={(value) => {
+              const date = new Date(value);
+              return `${date.getFullYear()} Q${Math.floor(date.getMonth() / 3) + 1}`;
+            }}
+            formatter={(value: number) => [`${value.toLocaleString()} M`, 'Revenue']}
           />
           <Area
             type="monotone"
