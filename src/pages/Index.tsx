@@ -11,15 +11,11 @@ import { useSearchParams } from "react-router-dom";
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTimestamp, setSearchTimestamp] = useState<number>(Date.now());
-  
-  // Get symbol from URL params instead of state
   const currentSymbol = searchParams.get('symbol');
 
-  // Add queries to check both tables
   const { data: fundamentalCheck } = useQuery({
     queryKey: ['fundamentalCheck'],
     queryFn: async () => {
-      // Check fundamental_data table
       const { data: fundamentalData, error: fundamentalError } = await supabase
         .from('fundamental_data')
         .select('symbol, revenue, gross_margin')
@@ -38,32 +34,45 @@ const Index = () => {
       if (!currentSymbol) return null;
       console.log('Fetching data for symbol:', currentSymbol, 'at timestamp:', searchTimestamp);
 
-      // First check if we have recent price data
-      const { data: existingPriceData, error: priceError } = await supabase
+      // Get ALL price data without any limit
+      const { data: priceData, error: priceError } = await supabase
         .from('stock_data')
         .select('*')
         .eq('symbol', currentSymbol)
         .order('date', { ascending: true });
 
       if (priceError) throw priceError;
-      console.log('Existing price data:', existingPriceData);
+      
+      // Log the date range of the price data
+      if (priceData && priceData.length > 0) {
+        console.log('Price data range:', {
+          first: priceData[0].date,
+          last: priceData[priceData.length - 1].date,
+          total: priceData.length
+        });
+      }
 
-      // Fetch and store fresh fundamental data via Edge Function
-      console.log('Fetching fresh fundamental data from API');
+      // Fetch fundamental data
       const response = await supabase.functions.invoke('fetchStockData', {
         body: { symbol: currentSymbol }
       });
 
       if (response.error) throw new Error(response.error.message);
-      console.log('API Response:', response);
       
-      // Combine existing price data with fundamental data from database
       const combinedData = {
         fundamentalData: response.data.fundamentalData || [],
-        priceData: existingPriceData || []
+        priceData: priceData || []
       };
       
-      console.log('Combined data:', combinedData);
+      console.log('Combined data:', {
+        fundamentalDataCount: combinedData.fundamentalData.length,
+        priceDataCount: combinedData.priceData.length,
+        priceDataRange: priceData && priceData.length > 0 ? {
+          first: priceData[0].date,
+          last: priceData[priceData.length - 1].date
+        } : null
+      });
+
       return combinedData;
     },
     enabled: !!currentSymbol
@@ -71,7 +80,6 @@ const Index = () => {
 
   const handleSearch = (symbol: string) => {
     console.log("Searching for symbol:", symbol);
-    // Update URL with new symbol
     setSearchParams({ symbol: symbol });
     setSearchTimestamp(Date.now());
   };
