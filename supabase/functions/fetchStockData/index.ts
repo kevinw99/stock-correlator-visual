@@ -36,11 +36,14 @@ serve(async (req) => {
     // Fetch price data
     const startDate = getDateYearsAgo(5);
     const priceUrl = `https://api.tiingo.com/tiingo/daily/${formattedSymbol}/prices?startDate=${startDate}&token=${TIINGO_API_KEY}`;
-    console.log(`Fetching price data...`);
+    console.log(`Fetching price data from URL: ${priceUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
     
     const priceResponse = await fetch(priceUrl);
+    console.log('Price API response status:', priceResponse.status);
+    
     if (!priceResponse.ok) {
-      console.error(`Price API error for ${formattedSymbol}:`, priceResponse.status);
+      const errorText = await priceResponse.text();
+      console.error(`Price API error for ${formattedSymbol}:`, priceResponse.status, errorText);
       throw new Error(`Invalid stock symbol or API error: ${formattedSymbol}`);
     }
     
@@ -50,34 +53,46 @@ serve(async (req) => {
       throw new Error(`No price data available for ${formattedSymbol}`);
     }
 
-    // Fetch fundamentals data using the correct endpoint
+    // Fetch fundamentals data
     const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?token=${TIINGO_API_KEY}`;
-    console.log(`Fetching fundamentals data...`);
+    console.log(`Fetching fundamentals data from URL: ${fundamentalsUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
     
     const fundamentalsResponse = await fetch(fundamentalsUrl);
+    console.log('Fundamentals API response status:', fundamentalsResponse.status);
+    
     let fundamentalsData = [];
     
     if (fundamentalsResponse.ok) {
       const rawFundamentals = await fundamentalsResponse.json();
-      console.log('Fundamentals data received:', {
-        status: fundamentalsResponse.status,
-        dataLength: rawFundamentals.length
-      });
+      console.log('Raw fundamentals data structure:', JSON.stringify(rawFundamentals[0], null, 2));
       
-      // Process fundamentals data
-      fundamentalsData = rawFundamentals.map(item => ({
-        date: item.date,
-        revenue: item.totalRevenue || null,
-        margin: item.grossMargin || null
-      }));
+      // Process fundamentals data with the correct structure
+      fundamentalsData = rawFundamentals.map(item => {
+        // Find revenue in statementData
+        const incomeStatement = item.statementData?.incomeStatement || [];
+        const revenue = incomeStatement.find(entry => entry.dataCode === 'totalRevenue')?.value || null;
+        
+        // Calculate margin if we have both revenue and gross profit
+        const grossProfit = incomeStatement.find(entry => entry.dataCode === 'grossProfit')?.value || null;
+        const margin = revenue && grossProfit ? (grossProfit / revenue) * 100 : null;
+        
+        return {
+          date: item.date,
+          revenue,
+          margin
+        };
+      });
       
       console.log('Processed fundamentals data:', {
         totalRecords: fundamentalsData.length,
-        sample: fundamentalsData[0]
+        sample: fundamentalsData[0],
+        sampleRevenue: fundamentalsData[0]?.revenue,
+        sampleMargin: fundamentalsData[0]?.margin
       });
     } else {
+      const errorText = await fundamentalsResponse.text();
       console.warn(`No fundamentals data available for ${formattedSymbol}:`, 
-        await fundamentalsResponse.text());
+        fundamentalsResponse.status, errorText);
     }
 
     // Create a map of fundamentals data by date for easier lookup
@@ -103,6 +118,13 @@ serve(async (req) => {
     const sortedData = combinedData.sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
+
+    console.log(`Final data summary for ${formattedSymbol}:`, {
+      totalRecords: sortedData.length,
+      recordsWithRevenue: sortedData.filter(d => d.revenue !== null).length,
+      recordsWithMargin: sortedData.filter(d => d.margin !== null).length,
+      sampleRecord: sortedData[0]
+    });
 
     // Store in Supabase
     const supabaseClient = createClient(
