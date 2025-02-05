@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
+import { FundamentalCharts } from "@/components/FundamentalCharts";
 
 const Index = () => {
   const [currentSymbol, setCurrentSymbol] = useState<string | null>(null);
@@ -14,7 +15,6 @@ const Index = () => {
     queryFn: async () => {
       if (!currentSymbol) return null;
 
-      // First, try to fetch from Supabase
       const { data: existingData, error: dbError } = await supabase
         .from('stock_data')
         .select('*')
@@ -23,7 +23,6 @@ const Index = () => {
 
       if (dbError) throw dbError;
 
-      // If we have recent data (less than a day old), use it
       if (existingData && existingData.length > 0) {
         const latestDate = new Date(existingData[existingData.length - 1].date);
         const isRecent = (Date.now() - latestDate.getTime()) < 24 * 60 * 60 * 1000;
@@ -34,7 +33,6 @@ const Index = () => {
         }
       }
 
-      // If no recent data, fetch from API
       console.log('Fetching fresh data from API');
       const response = await supabase.functions.invoke('fetchStockData', {
         body: { symbol: currentSymbol }
@@ -83,20 +81,7 @@ const Index = () => {
                 dataKey="price"
                 height={400}
               />
-              <div className="grid md:grid-cols-2 gap-6">
-                <StockChart
-                  data={stockData}
-                  title="Quarterly Revenue"
-                  dataKey="revenue"
-                  color="#0891b2"
-                />
-                <StockChart
-                  data={stockData}
-                  title="Profit Margin"
-                  dataKey="margin"
-                  color="#059669"
-                />
-              </div>
+              <FundamentalCharts data={stockData} symbol={currentSymbol} />
             </div>
           </div>
         )}
