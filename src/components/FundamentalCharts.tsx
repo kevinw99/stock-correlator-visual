@@ -27,24 +27,28 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
     })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Log the price data to see what we're working with
-  console.log('Price data before processing:', data.priceData?.map(d => ({
-    date: new Date(d.date),
-    timestamp: new Date(d.date).getTime()
-  })));
-
-  // Get the full date range from price data, making sure to sort it first
+  // Get the full date range from price data for the stock chart
   const dateRange = data.priceData ? {
     start: new Date(Math.min(...data.priceData.map(d => new Date(d.date).getTime()))),
     end: new Date(Math.max(...data.priceData.map(d => new Date(d.date).getTime())))
   } : null;
 
-  console.log('Calculated date range:', dateRange);
+  console.log('Stock chart date range:', dateRange);
 
+  // Format the quarterly data and ensure we're using announcement_date
   const formattedData = quarterlyData.map(item => ({
     ...item,
-    revenue: Number(item.revenue)
+    revenue: Number(item.revenue),
+    date: new Date(item.announcement_date || item.date) // Use announcement_date if available, fallback to date
   }));
+
+  // Calculate the date range for the bar chart based on the formatted quarterly data
+  const barChartDateRange = {
+    start: new Date(Math.min(...formattedData.map(d => d.date.getTime()))),
+    end: new Date(Math.max(...formattedData.map(d => d.date.getTime())))
+  };
+
+  console.log('Bar chart date range:', barChartDateRange);
 
   return (
     <div className="space-y-6">
@@ -65,7 +69,7 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
         dataKey="revenue"
         height={400}
         color="#0891b2"
-        dateRange={dateRange}
+        dateRange={barChartDateRange}
       />
     </div>
   );
