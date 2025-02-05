@@ -33,7 +33,7 @@ serve(async (req) => {
     const formattedSymbol = symbol.trim().toUpperCase();
     console.log(`Processing request for symbol: ${formattedSymbol}`);
 
-    // 获取价格数据
+    // Fetch price data
     const startDate = getDateYearsAgo(5);
     const priceUrl = `https://api.tiingo.com/tiingo/daily/${formattedSymbol}/prices?startDate=${startDate}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching price data for ${formattedSymbol}...`);
@@ -50,7 +50,7 @@ serve(async (req) => {
       throw new Error(`No price data available for ${formattedSymbol}`);
     }
 
-    // 获取基本面数据
+    // Fetch fundamentals data
     const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?token=${TIINGO_API_KEY}`;
     console.log(`Fetching fundamentals data for ${formattedSymbol}...`);
     
@@ -60,16 +60,26 @@ serve(async (req) => {
     if (fundamentalsResponse.ok) {
       fundamentalsData = await fundamentalsResponse.json();
       console.log(`Successfully fetched fundamentals data for ${formattedSymbol}:`, {
-        dataPoints: fundamentalsData.length
+        dataPoints: fundamentalsData.length,
+        sample: fundamentalsData[0] ? {
+          date: fundamentalsData[0].date,
+          revenue: fundamentalsData[0].quarterlyRevenue,
+          margin: fundamentalsData[0].grossMargin
+        } : null
       });
     } else {
       console.warn(`No fundamentals data available for ${formattedSymbol}`);
     }
 
-    // 合并数据
+    // Create a map of fundamentals data by date for easier lookup
+    const fundamentalsMap = new Map(
+      fundamentalsData.map(f => [f.date.split('T')[0], f])
+    );
+
+    // Merge data
     const combinedData = priceData.map(pricePoint => {
       const priceDate = pricePoint.date.split('T')[0];
-      const fundamentals = fundamentalsData.find(f => f.date.split('T')[0] === priceDate);
+      const fundamentals = fundamentalsMap.get(priceDate);
       
       return {
         date: priceDate,
@@ -80,12 +90,22 @@ serve(async (req) => {
       };
     });
 
-    // 按日期排序
+    // Sort by date
     const sortedData = combinedData.sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // 存储到 Supabase，使用 upsert 操作
+    console.log(`Combined data summary for ${formattedSymbol}:`, {
+      totalRecords: sortedData.length,
+      recordsWithRevenue: sortedData.filter(d => d.revenue !== null).length,
+      recordsWithMargin: sortedData.filter(d => d.margin !== null).length,
+      dateRange: {
+        start: sortedData[0]?.date,
+        end: sortedData[sortedData.length - 1]?.date
+      }
+    });
+
+    // Store in Supabase using upsert
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
