@@ -40,19 +40,8 @@ serve(async (req) => {
       { db: { schema: 'public' } }
     );
 
-    // Fetch price data
-    const startDate = getDateYearsAgo(10);
-    const priceUrl = `https://api.tiingo.com/tiingo/daily/${formattedSymbol}/prices?startDate=${startDate}&token=${TIINGO_API_KEY}`;
-    console.log(`Fetching price data from URL: ${priceUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
-    
-    const priceResponse = await fetch(priceUrl);
-    if (!priceResponse.ok) {
-      throw new Error(`Invalid stock symbol or API error: ${formattedSymbol}`);
-    }
-    
-    const priceData = await priceResponse.json();
-
     // Fetch fundamentals data
+    const startDate = getDateYearsAgo(10);
     const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?startDate=${startDate}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching fundamentals data from URL: ${fundamentalsUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
     
@@ -61,32 +50,14 @@ serve(async (req) => {
     
     console.log(`Received fundamentals data for ${formattedSymbol}:`, JSON.stringify(fundamentalsData).slice(0, 200) + '...');
 
-    // Store price data
-    const priceDataToStore = priceData.map((price: any) => ({
-      symbol: formattedSymbol,
-      date: price.date,
-      price: price.adjClose || price.close
-    }));
-
-    const { error: priceError } = await supabaseClient
-      .from('stock_data')
-      .upsert(priceDataToStore, {
-        onConflict: 'symbol,date'
-      });
-
-    if (priceError) {
-      console.error('Error storing price data:', priceError);
-      throw new Error('Failed to store price data');
-    }
-
-    // Store fundamental data
+    // Process and store fundamental data
     if (Array.isArray(fundamentalsData) && fundamentalsData.length > 0) {
       console.log(`Processing ${fundamentalsData.length} fundamental data records for ${formattedSymbol}`);
       
       for (const item of fundamentalsData) {
-        // Only process items that have quarter information (exclude annual reports)
+        // Skip annual reports (quarter = 0)
         if (!item.quarter || item.quarter === 0) {
-          console.log(`Skipping non-quarterly report for ${formattedSymbol} on ${item.date}`);
+          console.log(`Skipping annual report for ${formattedSymbol} on ${item.date}`);
           continue;
         }
 
@@ -103,12 +74,13 @@ serve(async (req) => {
           ? grossMarginItem.value * 100
           : (revenue && grossProfit ? (grossProfit / revenue) * 100 : null);
 
-        console.log(`Processing fundamental data for ${formattedSymbol} on ${item.date}:`, {
+        console.log(`Processing fundamental data for ${formattedSymbol}:`, {
+          date: item.date,
+          quarter: item.quarter,
+          year: item.year,
           revenue,
           grossProfit,
-          grossMargin,
-          quarter: item.quarter,
-          fiscal_year: item.year
+          grossMargin
         });
 
         try {
@@ -128,54 +100,31 @@ serve(async (req) => {
             });
 
           if (fundamentalError) {
-            console.error(`Error storing fundamental data for ${formattedSymbol} on ${item.date}:`, fundamentalError);
-            console.error('Failed item:', item);
+            console.error(`Error storing fundamental data for ${formattedSymbol}:`, fundamentalError);
             continue;
           }
 
           console.log(`Successfully stored fundamental data for ${formattedSymbol} on ${item.date}`);
         } catch (error) {
-          console.error(`Unexpected error storing fundamental data for ${formattedSymbol} on ${item.date}:`, error);
+          console.error(`Unexpected error storing fundamental data for ${formattedSymbol}:`, error);
           continue;
         }
       }
-    } else {
-      console.log(`No fundamental data available for ${formattedSymbol}`);
     }
 
-    // Fetch combined data for response
-    const { data: stockData, error: fetchError } = await supabaseClient
-      .from('stock_data')
-      .select('*')
-      .eq('symbol', formattedSymbol)
-      .order('date', { ascending: true });
-
-    const { data: fundamentalData, error: fetchFundamentalsError } = await supabaseClient
+    // Fetch the updated data
+    const { data: fundamentalData, error: fetchError } = await supabaseClient
       .from('fundamental_data')
       .select('*')
       .eq('symbol', formattedSymbol)
       .order('date', { ascending: true });
 
-    if (fetchError || fetchFundamentalsError) {
-      console.error('Error fetching stored data:', fetchError || fetchFundamentalsError);
+    if (fetchError) {
+      console.error('Error fetching stored data:', fetchError);
       throw new Error('Failed to fetch stored data');
     }
 
-    // Combine the data
-    const combinedData = stockData.map((price: any) => {
-      const fundamental = fundamentalData?.find(
-        (f: any) => f.date.split('T')[0] === price.date.split('T')[0]
-      );
-      return {
-        ...price,
-        revenue: fundamental?.revenue || null,
-        margin: fundamental?.gross_margin || null,
-        quarter: fundamental?.quarter || null,
-        fiscal_year: fundamental?.fiscal_year || null
-      };
-    });
-
-    return new Response(JSON.stringify(combinedData), {
+    return new Response(JSON.stringify(fundamentalData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
@@ -189,4 +138,4 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-})
+});
