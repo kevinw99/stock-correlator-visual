@@ -9,56 +9,43 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
   console.log('Raw data received in FundamentalCharts:', data);
   console.log('Symbol:', symbol);
 
-  // Helper function to determine quarter from date
-  const getQuarterFromDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const month = date.getMonth();
-    // Convert month (0-11) to quarter (1-4)
-    return Math.floor(month / 3) + 1;
-  };
-
-  // Helper function to get fiscal year from date
-  const getFiscalYearFromDate = (dateString: string) => {
-    return new Date(dateString).getFullYear();
-  };
-
   // Filter and sort data
-  const dataWithQuarters = data
+  const quarterlyData = data
     .filter(item => {
       console.log('Processing item:', item);
       const hasRevenue = item.revenue != null && item.revenue !== 0;
-      const hasDate = item.date != null;
+      const hasQuarter = item.quarter != null;
+      const hasYear = item.fiscal_year != null;
       
-      // Skip annual reports (typically much larger revenue numbers)
-      const isQuarterlyReport = item.revenue < 200000000000; // Threshold for quarterly vs annual
-
       console.log('Item validation:', {
         hasRevenue,
-        hasDate,
-        isQuarterlyReport,
+        hasQuarter,
+        hasYear,
         revenue: item.revenue,
-        date: item.date
+        quarter: item.quarter,
+        fiscal_year: item.fiscal_year
       });
 
-      return hasRevenue && hasDate && isQuarterlyReport;
+      return hasRevenue && hasQuarter && hasYear;
     })
     .map(item => ({
       ...item,
-      quarter: getQuarterFromDate(item.date),
-      fiscal_year: getFiscalYearFromDate(item.date),
       // Convert revenue to billions for display
       revenue: Number((item.revenue / 1000000000).toFixed(2))
     }))
     .sort((a, b) => {
-      // Sort by date
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
+      // Sort by fiscal year and quarter
+      if (a.fiscal_year !== b.fiscal_year) {
+        return a.fiscal_year - b.fiscal_year;
+      }
+      return a.quarter - b.quarter;
     });
 
-  console.log('Processed quarterly data:', dataWithQuarters);
-  console.log('Number of valid quarterly data points:', dataWithQuarters.length);
+  console.log('Processed quarterly data:', quarterlyData);
+  console.log('Number of valid quarterly data points:', quarterlyData.length);
 
   // Format data for display
-  const formattedData = dataWithQuarters.map(item => ({
+  const formattedData = quarterlyData.map(item => ({
     ...item,
     label: `Q${item.quarter} ${item.fiscal_year}`
   }));

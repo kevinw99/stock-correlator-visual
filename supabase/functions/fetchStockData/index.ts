@@ -6,12 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-function getDateYearsAgo(years: number): string {
-  const date = new Date();
-  date.setFullYear(date.getFullYear() - years);
-  return date.toISOString().split('T')[0];
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -41,8 +35,9 @@ serve(async (req) => {
     );
 
     // Fetch fundamentals data
-    const startDate = getDateYearsAgo(10);
-    const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?startDate=${startDate}&token=${TIINGO_API_KEY}`;
+    const startDate = new Date();
+    startDate.setFullYear(startDate.getFullYear() - 10);
+    const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?startDate=${startDate.toISOString().split('T')[0]}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching fundamentals data from URL: ${fundamentalsUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
     
     const fundamentalsResponse = await fetch(fundamentalsUrl);
@@ -55,9 +50,19 @@ serve(async (req) => {
       console.log(`Processing ${fundamentalsData.length} fundamental data records for ${formattedSymbol}`);
       
       for (const item of fundamentalsData) {
-        // Skip annual reports (quarter = 0)
-        if (!item.quarter || item.quarter === 0) {
-          console.log(`Skipping annual report for ${formattedSymbol} on ${item.date}`);
+        // Extract quarter and year directly from the API response
+        const quarter = item.quarter;
+        const year = item.year;
+
+        console.log('Raw statement data:', {
+          date: item.date,
+          quarter: quarter,
+          year: year
+        });
+
+        // Skip if quarter or year is missing
+        if (!quarter || !year) {
+          console.log(`Skipping record with missing quarter/year data: quarter=${quarter}, year=${year}`);
           continue;
         }
 
@@ -76,8 +81,8 @@ serve(async (req) => {
 
         console.log(`Processing fundamental data for ${formattedSymbol}:`, {
           date: item.date,
-          quarter: item.quarter,
-          year: item.year,
+          quarter: quarter,
+          year: year,
           revenue,
           grossProfit,
           grossMargin
@@ -92,8 +97,8 @@ serve(async (req) => {
               revenue,
               gross_profit: grossProfit,
               gross_margin: grossMargin,
-              quarter: item.quarter,
-              fiscal_year: item.year,
+              quarter: quarter,
+              fiscal_year: year,
               announcement_date: item.date
             }, {
               onConflict: 'symbol,date'
