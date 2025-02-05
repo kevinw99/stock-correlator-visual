@@ -1,4 +1,4 @@
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from 'recharts';
 import { Card } from './ui/card';
 import { format } from 'date-fns';
 
@@ -8,9 +8,22 @@ interface StockChartProps {
   dataKey: string;
   height?: number;
   color?: string;
+  announcementDates?: string[];
+  dateRange?: {
+    start: Date;
+    end: Date;
+  };
 }
 
-export const StockChart = ({ data, title, dataKey, height = 300, color = "#2563eb" }: StockChartProps) => {
+export const StockChart = ({ 
+  data, 
+  title, 
+  dataKey, 
+  height = 300, 
+  color = "#2563eb",
+  announcementDates = [],
+  dateRange
+}: StockChartProps) => {
   const formattedData = data.map(item => ({
     ...item,
     date: new Date(item.date)
@@ -29,6 +42,9 @@ export const StockChart = ({ data, title, dataKey, height = 300, color = "#2563e
           </defs>
           <XAxis 
             dataKey="date"
+            domain={dateRange ? [dateRange.start.getTime(), dateRange.end.getTime()] : ['auto', 'auto']}
+            type="number"
+            scale="time"
             tickFormatter={(value) => format(new Date(value), 'yyyy-MM-dd')}
             minTickGap={50}
           />
@@ -46,6 +62,15 @@ export const StockChart = ({ data, title, dataKey, height = 300, color = "#2563e
             fillOpacity={1}
             fill={`url(#gradient-${dataKey})`}
           />
+          {announcementDates.map((date, index) => (
+            <ReferenceLine
+              key={index}
+              x={new Date(date).getTime()}
+              stroke="#ff6b6b"
+              strokeDasharray="3 3"
+              label={{ value: 'ER', position: 'insideTop' }}
+            />
+          ))}
         </AreaChart>
       </ResponsiveContainer>
     </Card>

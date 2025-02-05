@@ -8,9 +8,20 @@ interface BarChartProps {
   dataKey: string;
   height?: number;
   color?: string;
+  dateRange?: {
+    start: Date;
+    end: Date;
+  };
 }
 
-export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb" }: BarChartProps) => {
+export const BarChart = ({ 
+  data, 
+  title, 
+  dataKey, 
+  height = 300, 
+  color = "#2563eb",
+  dateRange 
+}: BarChartProps) => {
   console.log('BarChart received data:', data);
   
   // Determine the appropriate unit based on the maximum revenue
@@ -31,18 +42,20 @@ export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb"
     return formatted;
   });
 
-  console.log('Final formatted data for chart:', formattedData);
-
   return (
     <Card className="p-4">
       <h3 className="text-lg font-semibold mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={height}>
-        <RechartsBarChart data={formattedData} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+        <RechartsBarChart 
+          data={formattedData} 
+          margin={{ top: 10, right: 30, left: 0, bottom: 20 }}
+        >
           <XAxis 
             dataKey="date"
-            tickFormatter={(value) => {
-              return format(new Date(value), 'yyyy-MM-dd');
-            }}
+            domain={dateRange ? [dateRange.start.getTime(), dateRange.end.getTime()] : ['auto', 'auto']}
+            type="number"
+            scale="time"
+            tickFormatter={(value) => format(new Date(value), 'yyyy-MM-dd')}
             angle={-45}
             textAnchor="end"
             height={60}
@@ -68,6 +81,7 @@ export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb"
             dataKey={dataKey}
             fill={color}
             radius={[4, 4, 0, 0]}
+            barSize={10} // Make bars narrower
           />
         </RechartsBarChart>
       </ResponsiveContainer>
