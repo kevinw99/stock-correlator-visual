@@ -24,21 +24,20 @@ export const BarChart = ({
 }: BarChartProps) => {
   console.log('BarChart received data:', data);
   
-  // Determine the appropriate unit based on the maximum revenue
-  const maxRevenue = Math.max(...data.map(item => Number(item.revenue) || 0));
-  const useMillions = maxRevenue < 1000000000; // Use millions if max revenue is less than 1B
-  const divisor = useMillions ? 1000000 : 1000000000;
-  const unitLabel = useMillions ? 'M' : 'B';
-  
   // Format revenue values to billions or millions
   const formattedData = data.map(item => {
+    const revenue = Number(item.revenue);
+    // Use billions if revenue is over 1B, otherwise use millions
+    const divisor = revenue >= 1000000000 ? 1000000000 : 1000000;
+    const unitLabel = revenue >= 1000000000 ? 'B' : 'M';
+    
     const formatted = {
       ...item,
-      revenue: Number(item.revenue) ? Number((Number(item.revenue) / divisor).toFixed(2)) : null,
+      revenue: revenue ? Number((revenue / divisor).toFixed(2)) : null,
       date: new Date(item.date),
       announcement_date: item.announcement_date ? new Date(item.announcement_date) : null
     };
-    console.log('Formatted chart item:', formatted);
+    console.log('Formatted revenue item:', formatted);
     return formatted;
   });
 
@@ -61,7 +60,7 @@ export const BarChart = ({
             height={60}
           />
           <YAxis 
-            tickFormatter={(value) => `${value.toFixed(1)}${unitLabel}`}
+            tickFormatter={(value) => `$${value}${value >= 1 ? 'B' : 'M'}`}
           />
           <CartesianGrid strokeDasharray="3 3" />
           <Tooltip
@@ -71,17 +70,14 @@ export const BarChart = ({
               borderRadius: '8px',
               padding: '8px'
             }}
-            formatter={(value: number) => [`$${value.toFixed(2)}${unitLabel}`, 'Revenue']}
-            labelFormatter={(label) => {
-              const item = formattedData.find(d => d.date.getTime() === new Date(label).getTime());
-              return item ? `Date: ${format(new Date(label), 'yyyy-MM-dd')}\nAnnouncement: ${format(item.announcement_date, 'yyyy-MM-dd')}` : '';
-            }}
+            formatter={(value: number) => [`$${value}${value >= 1 ? 'B' : 'M'}`, 'Revenue']}
+            labelFormatter={(label) => format(new Date(label), 'yyyy-MM-dd')}
           />
           <Bar
             dataKey={dataKey}
             fill={color}
             radius={[4, 4, 0, 0]}
-            barSize={10} // Make bars narrower
+            barSize={10}
           />
         </RechartsBarChart>
       </ResponsiveContainer>
