@@ -81,7 +81,8 @@ serve(async (req) => {
 
     // Store fundamental data
     if (Array.isArray(fundamentalsData) && fundamentalsData.length > 0) {
-      const fundamentalsToStore = fundamentalsData.map((item: any) => {
+      // Process fundamentals data one by one to avoid duplicate conflicts
+      for (const item of fundamentalsData) {
         const incomeStatement = item.statementData?.incomeStatement || [];
         const overview = item.statementData?.overview || [];
 
@@ -102,26 +103,23 @@ serve(async (req) => {
           grossMargin
         });
 
-        return {
-          symbol: formattedSymbol,
-          date: item.date,
-          revenue,
-          gross_profit: grossProfit,
-          gross_margin: grossMargin
-        };
-      });
+        const { error: fundamentalError } = await supabaseClient
+          .from('fundamental_data')
+          .upsert({
+            symbol: formattedSymbol,
+            date: item.date,
+            revenue,
+            gross_profit: grossProfit,
+            gross_margin: grossMargin
+          }, {
+            onConflict: 'symbol,date'
+          });
 
-      console.log('Storing fundamental data:', fundamentalsToStore);
-
-      const { error: fundamentalsError } = await supabaseClient
-        .from('fundamental_data')
-        .upsert(fundamentalsToStore, {
-          onConflict: 'symbol,date'
-        });
-
-      if (fundamentalsError) {
-        console.error('Error storing fundamentals data:', fundamentalsError);
-        throw new Error('Failed to store fundamentals data');
+        if (fundamentalError) {
+          console.error('Error storing fundamental data:', fundamentalError);
+          console.error('Failed item:', item);
+          throw fundamentalError;
+        }
       }
     }
 
