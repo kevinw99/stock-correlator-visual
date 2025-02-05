@@ -17,6 +17,15 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
     return null;
   }
 
+  // Get the full date range for price data
+  const priceDataRange = data.priceData && data.priceData.length > 0 ? {
+    start: new Date(Math.min(...data.priceData.map(d => new Date(d.date).getTime()))),
+    end: new Date(Math.max(...data.priceData.map(d => new Date(d.date).getTime())))
+  } : null;
+
+  console.log('Price data range:', priceDataRange);
+
+  // Process quarterly data
   const quarterlyData = data.fundamentalData
     .filter(item => {
       const hasRevenue = item.revenue != null;
@@ -27,49 +36,56 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
     })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Get the full date range from price data for the stock chart
-  const dateRange = data.priceData ? {
-    start: new Date(Math.min(...data.priceData.map(d => new Date(d.date).getTime()))),
-    end: new Date(Math.max(...data.priceData.map(d => new Date(d.date).getTime())))
-  } : null;
-
-  console.log('Stock chart date range:', dateRange);
-
-  // Format the quarterly data and ensure we're using announcement_date
-  const formattedData = quarterlyData.map(item => ({
+  // Format quarterly data and get its date range
+  const formattedQuarterlyData = quarterlyData.map(item => ({
     ...item,
     revenue: Number(item.revenue),
-    date: new Date(item.announcement_date || item.date) // Use announcement_date if available, fallback to date
+    date: new Date(item.announcement_date || item.date)
   }));
 
-  // Calculate the date range for the bar chart based on the formatted quarterly data
-  const barChartDateRange = {
-    start: new Date(Math.min(...formattedData.map(d => d.date.getTime()))),
-    end: new Date(Math.max(...formattedData.map(d => d.date.getTime())))
+  const quarterlyDataRange = formattedQuarterlyData.length > 0 ? {
+    start: new Date(Math.min(...formattedQuarterlyData.map(d => d.date.getTime()))),
+    end: new Date(Math.max(...formattedQuarterlyData.map(d => d.date.getTime())))
+  } : null;
+
+  console.log('Quarterly data range:', quarterlyDataRange);
+
+  // Get the global date range that covers both datasets
+  const globalDateRange = {
+    start: new Date(Math.min(
+      priceDataRange?.start?.getTime() || Infinity,
+      quarterlyDataRange?.start?.getTime() || Infinity
+    )),
+    end: new Date(Math.max(
+      priceDataRange?.end?.getTime() || -Infinity,
+      quarterlyDataRange?.end?.getTime() || -Infinity
+    ))
   };
 
-  console.log('Bar chart date range:', barChartDateRange);
+  console.log('Global date range for alignment:', globalDateRange);
 
   return (
     <div className="space-y-6">
-      {data.priceData && data.priceData.length > 0 && dateRange && (
+      {data.priceData && data.priceData.length > 0 && priceDataRange && (
         <StockChart
           data={data.priceData}
           title={`Stock Price History for ${symbol}`}
           dataKey="price"
           height={400}
           color="#0891b2"
-          announcementDates={formattedData.map(d => d.announcement_date)}
-          dateRange={dateRange}
+          announcementDates={formattedQuarterlyData.map(d => d.date.toISOString())}
+          dateRange={priceDataRange}  // Use full price data range
+          globalDateRange={globalDateRange}  // Pass global range for alignment
         />
       )}
       <BarChart
-        data={formattedData}
+        data={formattedQuarterlyData}
         title={`Quarterly Revenue for ${symbol}`}
         dataKey="revenue"
         height={400}
         color="#0891b2"
-        dateRange={barChartDateRange}
+        dateRange={quarterlyDataRange}  // Use full quarterly data range
+        globalDateRange={globalDateRange}  // Pass global range for alignment
       />
     </div>
   );

@@ -12,6 +12,10 @@ interface BarChartProps {
     start: Date;
     end: Date;
   };
+  globalDateRange?: {
+    start: Date;
+    end: Date;
+  };
 }
 
 export const BarChart = ({ 
@@ -20,15 +24,16 @@ export const BarChart = ({
   dataKey, 
   height = 300, 
   color = "#2563eb",
-  dateRange 
+  dateRange,
+  globalDateRange
 }: BarChartProps) => {
   console.log('BarChart received data:', data);
   console.log('Date range:', dateRange);
+  console.log('Global date range:', globalDateRange);
   
   // Format revenue values to billions or millions
   const formattedData = data.map(item => {
     const revenue = Number(item.revenue);
-    console.log('Processing revenue:', revenue, typeof revenue);
     
     // Use billions if revenue is over 1B, otherwise use millions
     const divisor = revenue >= 1000000000 ? 1000000000 : 1000000;
@@ -40,19 +45,18 @@ export const BarChart = ({
       date: new Date(item.date),
       announcement_date: item.announcement_date ? new Date(item.announcement_date) : null
     };
-    console.log('Formatted revenue item:', formatted);
     return formatted;
   });
 
-  console.log('Final formatted data:', formattedData);
-
-  // Calculate domain from actual data if dateRange is not provided
-  const domain = dateRange ? 
-    [dateRange.start.getTime(), dateRange.end.getTime()] : 
-    [
-      Math.min(...formattedData.map(d => new Date(d.date).getTime())),
-      Math.max(...formattedData.map(d => new Date(d.date).getTime()))
-    ];
+  // Use the global date range for the domain if provided, otherwise use the local date range
+  const domain = globalDateRange ? 
+    [globalDateRange.start.getTime(), globalDateRange.end.getTime()] : 
+    dateRange ? 
+      [dateRange.start.getTime(), dateRange.end.getTime()] :
+      [
+        Math.min(...formattedData.map(d => new Date(d.date).getTime())),
+        Math.max(...formattedData.map(d => new Date(d.date).getTime()))
+      ];
   
   console.log('Calculated X-axis domain:', domain);
 

@@ -13,6 +13,10 @@ interface StockChartProps {
     start: Date;
     end: Date;
   };
+  globalDateRange?: {
+    start: Date;
+    end: Date;
+  };
 }
 
 export const StockChart = ({ 
@@ -22,12 +26,23 @@ export const StockChart = ({
   height = 300, 
   color = "#2563eb",
   announcementDates = [],
-  dateRange
+  dateRange,
+  globalDateRange
 }: StockChartProps) => {
+  console.log('StockChart date range:', dateRange);
+  console.log('StockChart global date range:', globalDateRange);
+
   const formattedData = data.map(item => ({
     ...item,
     date: new Date(item.date)
   }));
+
+  // Use the global date range for the domain if provided, otherwise use the local date range
+  const domain = globalDateRange ? 
+    [globalDateRange.start.getTime(), globalDateRange.end.getTime()] : 
+    dateRange ? 
+      [dateRange.start.getTime(), dateRange.end.getTime()] :
+      ['auto', 'auto'];
 
   return (
     <Card className="p-4">
@@ -42,7 +57,7 @@ export const StockChart = ({
           </defs>
           <XAxis 
             dataKey="date"
-            domain={dateRange ? [dateRange.start.getTime(), dateRange.end.getTime()] : ['auto', 'auto']}
+            domain={domain}
             type="number"
             scale="time"
             tickFormatter={(value) => format(new Date(value), 'yyyy-MM-dd')}
