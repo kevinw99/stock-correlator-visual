@@ -8,6 +8,17 @@ import { Loader2 } from "lucide-react";
 import { FundamentalCharts } from "@/components/FundamentalCharts";
 import { useSearchParams } from "react-router-dom";
 
+// Define the type for the weekly stock data response
+type WeeklyStockData = {
+  id: number;
+  symbol: string;
+  date: string;
+  price: number;
+  revenue: number | null;
+  margin: number | null;
+  created_at: string;
+}
+
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTimestamp, setSearchTimestamp] = useState<number>(Date.now());
@@ -40,7 +51,7 @@ const Index = () => {
           p_symbol: currentSymbol,
           start_date: '2015-01-01',
           end_date: '2025-12-31'
-        });
+        }) as { data: WeeklyStockData[] | null, error: any };
 
       if (priceError) throw priceError;
       
