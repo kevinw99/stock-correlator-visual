@@ -34,15 +34,32 @@ const Index = () => {
       if (!currentSymbol) return null;
       console.log('Fetching data for symbol:', currentSymbol, 'at timestamp:', searchTimestamp);
 
-      // Always fetch fresh data from API
-      console.log('Fetching fresh data from API');
+      // First check if we have recent price data
+      const { data: existingPriceData, error: priceError } = await supabase
+        .from('stock_data')
+        .select('*')
+        .eq('symbol', currentSymbol)
+        .order('date', { ascending: true });
+
+      if (priceError) throw priceError;
+      console.log('Existing price data:', existingPriceData);
+
+      // Always fetch fresh fundamental data from API
+      console.log('Fetching fresh fundamental data from API');
       const response = await supabase.functions.invoke('fetchStockData', {
         body: { symbol: currentSymbol }
       });
 
       if (response.error) throw new Error(response.error.message);
-      console.log('API response data:', response.data);
-      return response.data;
+      
+      // Combine existing price data with fresh fundamental data
+      const combinedData = {
+        ...response.data,
+        priceData: existingPriceData || []
+      };
+      
+      console.log('Combined data:', combinedData);
+      return combinedData;
     },
     enabled: !!currentSymbol
   });
