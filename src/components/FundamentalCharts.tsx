@@ -11,10 +11,8 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
     .filter(item => item.revenue != null)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  console.log('Quarterly Revenue Data:', dataWithRevenue.map(d => ({
-    date: d.date,
-    revenue: d.revenue
-  })));
+  console.log('Data received in FundamentalCharts:', data);
+  console.log('Filtered data with revenue:', dataWithRevenue);
 
   return (
     <div className="space-y-6">

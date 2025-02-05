@@ -52,26 +52,9 @@ const Index = () => {
       console.log('Existing fundamental data:', existingFundamentalData);
       console.log('Existing price data:', existingPriceData);
 
-      if (existingPriceData && existingPriceData.length > 0) {
-        const latestDate = new Date(existingPriceData[existingPriceData.length - 1].date);
-        const isRecent = (Date.now() - latestDate.getTime()) < 24 * 60 * 60 * 1000;
-        
-        if (isRecent) {
-          console.log('Using cached data from Supabase');
-          // Combine the data
-          const combinedData = existingPriceData.map(price => {
-            const fundamental = existingFundamentalData?.find(
-              f => f.date.split('T')[0] === price.date.split('T')[0]
-            );
-            return {
-              ...price,
-              revenue: fundamental?.revenue || null,
-              margin: fundamental?.gross_margin || null
-            };
-          });
-          console.log('Combined data:', combinedData);
-          return combinedData;
-        }
+      if (existingFundamentalData && existingFundamentalData.length > 0) {
+        console.log('Using existing fundamental data');
+        return existingFundamentalData;
       }
 
       console.log('Fetching fresh data from API');
@@ -127,12 +110,6 @@ const Index = () => {
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold mb-4">{currentSymbol} Analysis</h2>
             <div className="space-y-6">
-              <StockChart
-                data={stockData}
-                title="Stock Price"
-                dataKey="price"
-                height={400}
-              />
               <FundamentalCharts data={stockData} symbol={currentSymbol} />
             </div>
           </div>
