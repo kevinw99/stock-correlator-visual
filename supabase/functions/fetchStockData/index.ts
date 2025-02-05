@@ -27,9 +27,16 @@ serve(async (req) => {
 
     // Fetch 5 years of historical price data
     const priceUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${symbol}?from=${getDateYearsAgo(5)}&apikey=${FMP_API_KEY}`;
-    console.log('Fetching price data from:', priceUrl);
+    console.log('Attempting to fetch price data...');
     const priceResponse = await fetch(priceUrl);
+    
+    if (!priceResponse.ok) {
+      console.error('Price API response not OK:', priceResponse.status, await priceResponse.text());
+      throw new Error(`Failed to fetch price data: ${priceResponse.status}`);
+    }
+    
     const priceData = await priceResponse.json();
+    console.log('Price data received:', priceData ? 'yes' : 'no', 'Historical data:', priceData.historical ? priceData.historical.length : 0);
 
     // Check if price data is valid
     if (!priceData.historical || priceData.historical.length === 0) {
@@ -39,9 +46,16 @@ serve(async (req) => {
 
     // Fetch quarterly income statements for revenue data
     const incomeUrl = `https://financialmodelingprep.com/api/v3/income-statement/${symbol}?period=quarter&limit=20&apikey=${FMP_API_KEY}`;
-    console.log('Fetching income data from:', incomeUrl);
+    console.log('Attempting to fetch income data...');
     const incomeResponse = await fetch(incomeUrl);
+    
+    if (!incomeResponse.ok) {
+      console.error('Income API response not OK:', incomeResponse.status, await incomeResponse.text());
+      throw new Error(`Failed to fetch income data: ${incomeResponse.status}`);
+    }
+    
     const incomeData = await incomeResponse.json();
+    console.log('Income data received:', incomeData ? 'yes' : 'no', 'Records:', Array.isArray(incomeData) ? incomeData.length : 0);
 
     // Check if income data is valid
     if (!Array.isArray(incomeData) || incomeData.length === 0) {
@@ -107,7 +121,7 @@ serve(async (req) => {
         error: error.message,
         details: 'Please ensure the stock symbol is valid and try again.'
       }), {
-      status: 400, // Changed from 500 to 400 for invalid input
+      status: 400, // Using 400 for invalid input rather than 500
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
