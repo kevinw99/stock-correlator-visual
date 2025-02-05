@@ -1,5 +1,4 @@
 import { StockChart } from './StockChart';
-import { Card } from './ui/card';
 
 interface FundamentalChartsProps {
   data: any[];
@@ -29,7 +28,9 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
     });
   };
 
-  const dataWithCalculations = calculateYoYGrowth(calculateTTM(data));
+  // Filter out entries without revenue data
+  const dataWithRevenue = data.filter(item => item.revenue != null);
+  const dataWithCalculations = calculateYoYGrowth(calculateTTM(dataWithRevenue));
 
   return (
     <div className="space-y-6">

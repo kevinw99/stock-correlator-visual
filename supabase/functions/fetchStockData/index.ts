@@ -52,8 +52,8 @@ serve(async (req) => {
     
     const priceData = await priceResponse.json();
 
-    // Fetch fundamentals data
-    const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?token=${TIINGO_API_KEY}`;
+    // Fetch fundamentals data - now also using 10 years
+    const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?startDate=${startDate}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching fundamentals data from URL: ${fundamentalsUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
     
     const fundamentalsResponse = await fetch(fundamentalsUrl);
