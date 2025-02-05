@@ -41,8 +41,12 @@ serve(async (req) => {
     console.log(`Fetching fundamentals data from URL: ${fundamentalsUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
     
     const fundamentalsResponse = await fetch(fundamentalsUrl);
-    const fundamentalsData = await fundamentalsResponse.json();
+    if (!fundamentalsResponse.ok) {
+      console.error(`Error fetching fundamental data: ${fundamentalsResponse.status}`);
+      throw new Error('Failed to fetch fundamental data');
+    }
     
+    const fundamentalsData = await fundamentalsResponse.json();
     console.log(`Received fundamentals data for ${formattedSymbol}:`, JSON.stringify(fundamentalsData).slice(0, 200) + '...');
 
     // Process and store fundamental data
@@ -50,7 +54,6 @@ serve(async (req) => {
       console.log(`Processing ${fundamentalsData.length} fundamental data records for ${formattedSymbol}`);
       
       for (const item of fundamentalsData) {
-        // Extract quarter and year directly from the API response
         const quarter = item.quarter;
         const year = item.year;
 
@@ -60,7 +63,6 @@ serve(async (req) => {
           year: year
         });
 
-        // Skip if quarter or year is missing
         if (!quarter || !year) {
           console.log(`Skipping record with missing quarter/year data: quarter=${quarter}, year=${year}`);
           continue;
@@ -117,19 +119,11 @@ serve(async (req) => {
       }
     }
 
-    // Fetch the updated data
-    const { data: fundamentalData, error: fetchError } = await supabaseClient
-      .from('fundamental_data')
-      .select('*')
-      .eq('symbol', formattedSymbol)
-      .order('date', { ascending: true });
-
-    if (fetchError) {
-      console.error('Error fetching stored data:', fetchError);
-      throw new Error('Failed to fetch stored data');
-    }
-
-    return new Response(JSON.stringify(fundamentalData), {
+    // Return the response with both the raw API data and stored data
+    return new Response(JSON.stringify({
+      fundamentalData: fundamentalsData,
+      message: 'Data processed successfully'
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

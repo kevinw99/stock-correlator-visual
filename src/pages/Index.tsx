@@ -51,6 +51,7 @@ const Index = () => {
       });
 
       if (response.error) throw new Error(response.error.message);
+      console.log('API Response:', response);
       
       // Combine existing price data with fresh fundamental data
       const combinedData = {
