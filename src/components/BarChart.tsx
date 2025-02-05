@@ -45,7 +45,16 @@ export const BarChart = ({
   });
 
   console.log('Final formatted data:', formattedData);
-  console.log('X-axis domain:', dateRange ? [dateRange.start.getTime(), dateRange.end.getTime()] : ['auto', 'auto']);
+
+  // Calculate domain from actual data if dateRange is not provided
+  const domain = dateRange ? 
+    [dateRange.start.getTime(), dateRange.end.getTime()] : 
+    [
+      Math.min(...formattedData.map(d => new Date(d.date).getTime())),
+      Math.max(...formattedData.map(d => new Date(d.date).getTime()))
+    ];
+  
+  console.log('Calculated X-axis domain:', domain);
 
   return (
     <Card className="p-4">
@@ -57,7 +66,7 @@ export const BarChart = ({
         >
           <XAxis 
             dataKey="date"
-            domain={dateRange ? [dateRange.start.getTime(), dateRange.end.getTime()] : ['auto', 'auto']}
+            domain={domain}
             type="number"
             scale="time"
             tickFormatter={(value) => format(new Date(value), 'yyyy-MM-dd')}
