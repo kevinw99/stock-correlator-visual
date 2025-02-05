@@ -54,18 +54,22 @@ serve(async (req) => {
     const rawData = await response.json()
     
     // Transform Tiingo data format to match our existing structure
-    const fundamentalData = rawData.map((statement: any) => ({
-      symbol: symbol,
-      date: statement.date,
-      announcement_date: statement.date, // Tiingo doesn't provide announcement date
-      revenue: statement.totalRevenue,
-      gross_profit: statement.grossProfit,
-      gross_margin: statement.grossProfit / statement.totalRevenue * 100,
-      quarter: new Date(statement.date).getMonth() / 3 + 1,
-      fiscal_year: new Date(statement.date).getFullYear()
-    }));
+    const fundamentalData = rawData
+      .filter((statement: any) => statement.totalRevenue != null)
+      .map((statement: any) => ({
+        symbol: symbol,
+        date: statement.date,
+        announcement_date: statement.date, // Tiingo doesn't provide announcement date
+        revenue: parseFloat(statement.totalRevenue),
+        gross_profit: statement.grossProfit ? parseFloat(statement.grossProfit) : null,
+        gross_margin: statement.grossProfit && statement.totalRevenue ? 
+          (parseFloat(statement.grossProfit) / parseFloat(statement.totalRevenue)) * 100 : null,
+        quarter: Math.floor(new Date(statement.date).getMonth() / 3) + 1,
+        fiscal_year: new Date(statement.date).getFullYear()
+      }))
+      .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    console.log(`Received ${fundamentalData.length} quarters of fundamental data`)
+    console.log(`Processed ${fundamentalData.length} quarters of fundamental data:`, fundamentalData[0]);
 
     return new Response(
       JSON.stringify({ fundamentalData }),
