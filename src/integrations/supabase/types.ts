@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      fundamental_data: {
+        Row: {
+          created_at: string | null
+          date: string
+          gross_margin: number | null
+          gross_profit: number | null
+          id: number
+          revenue: number | null
+          symbol: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          gross_margin?: number | null
+          gross_profit?: number | null
+          id?: number
+          revenue?: number | null
+          symbol: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          gross_margin?: number | null
+          gross_profit?: number | null
+          id?: number
+          revenue?: number | null
+          symbol?: string
+        }
+        Relationships: []
+      }
       stock_data: {
         Row: {
           created_at: string | null

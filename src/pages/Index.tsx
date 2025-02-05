@@ -9,22 +9,22 @@ import { FundamentalCharts } from "@/components/FundamentalCharts";
 
 const Index = () => {
   const [currentSymbol, setCurrentSymbol] = useState<string | null>(null);
-  // Add a timestamp to force refresh when the same symbol is searched
   const [searchTimestamp, setSearchTimestamp] = useState<number>(Date.now());
 
-  // Add a query to check fundamental data
+  // Add queries to check both tables
   const { data: fundamentalCheck } = useQuery({
     queryKey: ['fundamentalCheck'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('stock_data')
-        .select('symbol, revenue, margin')
+      // Check fundamental_data table
+      const { data: fundamentalData, error: fundamentalError } = await supabase
+        .from('fundamental_data')
+        .select('symbol, revenue, gross_margin')
         .not('revenue', 'is', null)
         .limit(5);
 
-      if (error) throw error;
-      console.log('Sample of fundamental data:', data);
-      return data;
+      if (fundamentalError) throw fundamentalError;
+      console.log('Sample of fundamental data:', fundamentalData);
+      return fundamentalData;
     }
   });
 
@@ -34,21 +34,38 @@ const Index = () => {
       if (!currentSymbol) return null;
       console.log('Fetching data for symbol:', currentSymbol, 'at timestamp:', searchTimestamp);
 
-      const { data: existingData, error: dbError } = await supabase
+      // First check if we have recent data in both tables
+      const { data: existingPriceData, error: priceError } = await supabase
         .from('stock_data')
         .select('*')
         .eq('symbol', currentSymbol)
         .order('date', { ascending: true });
 
-      if (dbError) throw dbError;
+      const { data: existingFundamentalData, error: fundamentalError } = await supabase
+        .from('fundamental_data')
+        .select('*')
+        .eq('symbol', currentSymbol)
+        .order('date', { ascending: true });
 
-      if (existingData && existingData.length > 0) {
-        const latestDate = new Date(existingData[existingData.length - 1].date);
+      if (priceError || fundamentalError) throw (priceError || fundamentalError);
+
+      if (existingPriceData && existingPriceData.length > 0) {
+        const latestDate = new Date(existingPriceData[existingPriceData.length - 1].date);
         const isRecent = (Date.now() - latestDate.getTime()) < 24 * 60 * 60 * 1000;
         
         if (isRecent) {
           console.log('Using cached data from Supabase');
-          return existingData;
+          // Combine the data
+          return existingPriceData.map(price => {
+            const fundamental = existingFundamentalData?.find(
+              f => f.date.split('T')[0] === price.date.split('T')[0]
+            );
+            return {
+              ...price,
+              revenue: fundamental?.revenue || null,
+              margin: fundamental?.gross_margin || null
+            };
+          });
         }
       }
 
@@ -77,7 +94,6 @@ const Index = () => {
           <StockSearch onSearch={handleSearch} />
         </div>
 
-        {/* Add fundamental data check */}
         {fundamentalCheck && fundamentalCheck.length > 0 && (
           <Alert>
             <AlertDescription>

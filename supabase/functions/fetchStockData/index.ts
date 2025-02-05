@@ -33,7 +33,7 @@ serve(async (req) => {
     const formattedSymbol = symbol.trim().toUpperCase();
     console.log(`Processing request for symbol: ${formattedSymbol}`);
 
-    // Fetch price data - now fetching 10 years of data
+    // Fetch price data
     const startDate = getDateYearsAgo(10);
     const priceUrl = `https://api.tiingo.com/tiingo/daily/${formattedSymbol}/prices?startDate=${startDate}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching price data from URL: ${priceUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
@@ -53,7 +53,7 @@ serve(async (req) => {
       throw new Error(`No price data available for ${formattedSymbol}`);
     }
 
-    // Fetch fundamentals data - using startDate parameter for longer history
+    // Fetch fundamentals data
     const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?startDate=${startDate}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching fundamentals data from URL: ${fundamentalsUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
     
@@ -66,25 +66,21 @@ serve(async (req) => {
       const rawFundamentals = await fundamentalsResponse.json();
       console.log('Raw fundamentals summary:', {
         totalRecords: rawFundamentals.length,
-        dateRange: {
+        dateRange: rawFundamentals.length > 0 ? {
           start: rawFundamentals[0]?.date,
           end: rawFundamentals[rawFundamentals.length - 1]?.date
-        }
+        } : null
       });
       
-      // Process fundamentals data with the correct structure
+      // Process fundamentals data
       fundamentalsData = rawFundamentals.map(item => {
         const incomeStatement = item.statementData?.incomeStatement || [];
         const overview = item.statementData?.overview || [];
 
-        // Find revenue and gross profit in income statement
         const revenueItem = incomeStatement.find(entry => entry.dataCode === 'revenue');
         const grossProfitItem = incomeStatement.find(entry => entry.dataCode === 'grossProfit');
-        
-        // Find gross margin in overview
         const grossMarginItem = overview.find(entry => entry.dataCode === 'grossMargin');
         
-        // Extract values
         const revenue = revenueItem?.value || null;
         const grossProfit = grossProfitItem?.value || null;
         const grossMargin = grossMarginItem?.value 
@@ -101,15 +97,9 @@ serve(async (req) => {
         return {
           date: item.date,
           revenue,
-          margin: grossMargin
+          gross_profit: grossProfit,
+          gross_margin: grossMargin
         };
-      });
-      
-      console.log('Processed fundamentals summary:', {
-        totalRecords: fundamentalsData.length,
-        sample: fundamentalsData[0],
-        sampleRevenue: fundamentalsData[0]?.revenue,
-        sampleMargin: fundamentalsData[0]?.margin
       });
     } else {
       const errorText = await fundamentalsResponse.text();
@@ -117,61 +107,94 @@ serve(async (req) => {
         fundamentalsResponse.status, errorText);
     }
 
-    // Create a map of fundamentals data by date for easier lookup
-    const fundamentalsMap = new Map(
-      fundamentalsData.map(f => [f.date.split('T')[0], f])
-    );
-
-    // Merge data
-    const combinedData = priceData.map(pricePoint => {
-      const priceDate = pricePoint.date.split('T')[0];
-      const fundamentals = fundamentalsMap.get(priceDate);
-      
-      return {
-        date: priceDate,
-        price: pricePoint.adjClose || pricePoint.close,
-        revenue: fundamentals?.revenue || null,
-        margin: fundamentals?.margin || null,
-        symbol: formattedSymbol
-      };
-    });
-
-    // Sort by date
-    const sortedData = combinedData.sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-
-    console.log(`Final data summary for ${formattedSymbol}:`, {
-      totalRecords: sortedData.length,
-      recordsWithRevenue: sortedData.filter(d => d.revenue !== null).length,
-      recordsWithMargin: sortedData.filter(d => d.margin !== null).length,
-      dateRange: {
-        start: sortedData[0]?.date,
-        end: sortedData[sortedData.length - 1]?.date
-      },
-      sampleRecord: sortedData[0]
-    });
-
-    // Store in Supabase
+    // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { db: { schema: 'public' } }
     );
 
-    const { error: insertError } = await supabaseClient
+    // Store price data
+    const priceDataToStore = priceData.map(price => ({
+      symbol: formattedSymbol,
+      date: price.date,
+      price: price.adjClose || price.close
+    }));
+
+    const { error: priceError } = await supabaseClient
       .from('stock_data')
-      .upsert(sortedData, {
+      .upsert(priceDataToStore, {
         onConflict: 'symbol,date',
         ignoreDuplicates: false
       });
 
-    if (insertError) {
-      console.error('Error inserting data into Supabase:', insertError);
-      throw new Error('Failed to store data');
+    if (priceError) {
+      console.error('Error storing price data:', priceError);
+      throw new Error('Failed to store price data');
     }
 
-    return new Response(JSON.stringify(sortedData), {
+    // Store fundamental data
+    if (fundamentalsData.length > 0) {
+      const fundamentalsToStore = fundamentalsData.map(fundamental => ({
+        symbol: formattedSymbol,
+        date: fundamental.date,
+        revenue: fundamental.revenue,
+        gross_profit: fundamental.gross_profit,
+        gross_margin: fundamental.gross_margin
+      }));
+
+      const { error: fundamentalsError } = await supabaseClient
+        .from('fundamental_data')
+        .upsert(fundamentalsToStore, {
+          onConflict: 'symbol,date',
+          ignoreDuplicates: false
+        });
+
+      if (fundamentalsError) {
+        console.error('Error storing fundamentals data:', fundamentalsError);
+        throw new Error('Failed to store fundamentals data');
+      }
+    }
+
+    // Fetch combined data for response
+    const { data: stockData, error: fetchError } = await supabaseClient
+      .from('stock_data')
+      .select('*')
+      .eq('symbol', formattedSymbol)
+      .order('date', { ascending: true });
+
+    const { data: fundamentalData, error: fetchFundamentalsError } = await supabaseClient
+      .from('fundamental_data')
+      .select('*')
+      .eq('symbol', formattedSymbol)
+      .order('date', { ascending: true });
+
+    if (fetchError || fetchFundamentalsError) {
+      console.error('Error fetching stored data:', fetchError || fetchFundamentalsError);
+      throw new Error('Failed to fetch stored data');
+    }
+
+    // Combine the data
+    const combinedData = stockData.map(price => {
+      const fundamental = fundamentalData.find(f => f.date.split('T')[0] === price.date.split('T')[0]);
+      return {
+        ...price,
+        revenue: fundamental?.revenue || null,
+        margin: fundamental?.gross_margin || null
+      };
+    });
+
+    console.log(`Final data summary for ${formattedSymbol}:`, {
+      totalRecords: combinedData.length,
+      recordsWithRevenue: combinedData.filter(d => d.revenue !== null).length,
+      recordsWithMargin: combinedData.filter(d => d.margin !== null).length,
+      dateRange: {
+        start: combinedData[0]?.date,
+        end: combinedData[combinedData.length - 1]?.date
+      }
+    });
+
+    return new Response(JSON.stringify(combinedData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
