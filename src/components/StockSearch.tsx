@@ -14,6 +14,7 @@ export const StockSearch = ({ onSearch }: StockSearchProps) => {
     e.preventDefault();
     if (symbol.trim()) {
       onSearch(symbol.toUpperCase());
+      console.log("Search submitted for:", symbol.toUpperCase());
     }
   };
 

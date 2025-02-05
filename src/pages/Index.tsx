@@ -9,11 +9,14 @@ import { FundamentalCharts } from "@/components/FundamentalCharts";
 
 const Index = () => {
   const [currentSymbol, setCurrentSymbol] = useState<string | null>(null);
+  // Add a timestamp to force refresh when the same symbol is searched
+  const [searchTimestamp, setSearchTimestamp] = useState<number>(Date.now());
 
   const { data: stockData, isLoading, error } = useQuery({
-    queryKey: ['stockData', currentSymbol],
+    queryKey: ['stockData', currentSymbol, searchTimestamp],
     queryFn: async () => {
       if (!currentSymbol) return null;
+      console.log('Fetching data for symbol:', currentSymbol, 'at timestamp:', searchTimestamp);
 
       const { data: existingData, error: dbError } = await supabase
         .from('stock_data')
@@ -47,6 +50,8 @@ const Index = () => {
   const handleSearch = (symbol: string) => {
     console.log("Searching for symbol:", symbol);
     setCurrentSymbol(symbol);
+    // Update timestamp to force a refresh even if the symbol is the same
+    setSearchTimestamp(Date.now());
   };
 
   return (
