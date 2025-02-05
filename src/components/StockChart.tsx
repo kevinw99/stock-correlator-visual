@@ -29,20 +29,28 @@ export const StockChart = ({
   dateRange,
   globalDateRange
 }: StockChartProps) => {
+  console.log('StockChart received data length:', data.length);
+  console.log('First data point:', data[0]);
+  console.log('Last data point:', data[data.length - 1]);
   console.log('StockChart date range:', dateRange);
   console.log('StockChart global date range:', globalDateRange);
 
   const formattedData = data.map(item => ({
     ...item,
-    date: new Date(item.date)
+    date: new Date(item.date).getTime()
   }));
 
-  // Use the global date range for the domain if provided, otherwise use the local date range
-  const domain = globalDateRange ? 
-    [globalDateRange.start.getTime(), globalDateRange.end.getTime()] : 
-    dateRange ? 
-      [dateRange.start.getTime(), dateRange.end.getTime()] :
-      ['auto', 'auto'];
+  console.log('Formatted data range:', {
+    start: new Date(formattedData[0].date),
+    end: new Date(formattedData[formattedData.length - 1].date)
+  });
+
+  // Use the local date range for the domain if provided, otherwise use auto
+  const domain = dateRange ? 
+    [dateRange.start.getTime(), dateRange.end.getTime()] : 
+    ['auto', 'auto'];
+
+  console.log('Chart domain:', domain);
 
   return (
     <Card className="p-4">
@@ -60,14 +68,14 @@ export const StockChart = ({
             domain={domain}
             type="number"
             scale="time"
-            tickFormatter={(value) => format(new Date(value), 'yyyy-MM-dd')}
+            tickFormatter={(value) => format(value, 'yyyy-MM-dd')}
             minTickGap={50}
           />
           <YAxis />
           <CartesianGrid strokeDasharray="3 3" />
           <Tooltip
             contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
-            labelFormatter={(value) => format(new Date(value), 'yyyy-MM-dd')}
+            labelFormatter={(value) => format(value, 'yyyy-MM-dd')}
             formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
           />
           <Area
@@ -77,14 +85,16 @@ export const StockChart = ({
             fillOpacity={1}
             fill={`url(#gradient-${dataKey})`}
           />
-          {announcementDates.map((date, index) => (
-            <ReferenceLine
-              key={index}
-              x={new Date(date).getTime()}
-              stroke="#ff6b6b"
-              strokeDasharray="3 3"
-              label={{ value: 'ER', position: 'insideTop' }}
-            />
+          {announcementDates?.map((date, index) => (
+            date && (
+              <ReferenceLine
+                key={index}
+                x={new Date(date).getTime()}
+                stroke="#ff6b6b"
+                strokeDasharray="3 3"
+                label={{ value: 'ER', position: 'insideTop' }}
+              />
+            )
           ))}
         </AreaChart>
       </ResponsiveContainer>
