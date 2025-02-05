@@ -6,32 +6,44 @@ interface FundamentalChartsProps {
 }
 
 export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
-  console.log('Raw data before filtering:', data);
-  console.log('Sample data item:', data[0]);
+  console.log('Raw data received in FundamentalCharts:', data);
+  console.log('Symbol:', symbol);
 
   // Filter out entries without revenue data and sort by announcement date
   const dataWithRevenue = data
     .filter(item => {
-      console.log('Checking item:', item);
-      console.log('Quarter value:', item.quarter);
-      console.log('Revenue value:', item.revenue);
+      console.log('Checking item for revenue data:', item);
+      const hasRevenue = item.revenue != null;
+      const hasQuarter = item.quarter != null && item.quarter > 0 && item.quarter <= 4;
+      const hasFiscalYear = item.fiscal_year != null;
       
-      return item.revenue != null && 
-             item.quarter != null && 
-             item.quarter > 0 && 
-             item.quarter <= 4;
-    })
-    .sort((a, b) => new Date(a.announcement_date || a.date).getTime() - new Date(b.announcement_date || b.date).getTime());
+      console.log('Item validation:', {
+        hasRevenue,
+        hasQuarter,
+        hasFiscalYear,
+        revenue: item.revenue,
+        quarter: item.quarter,
+        fiscalYear: item.fiscal_year
+      });
 
-  console.log('Data received in FundamentalCharts:', data);
-  console.log('Filtered quarterly data with revenue:', dataWithRevenue);
-  console.log('Number of items after filtering:', dataWithRevenue.length);
+      return hasRevenue && hasQuarter && hasFiscalYear;
+    })
+    .sort((a, b) => {
+      // Sort by fiscal year and quarter
+      if (a.fiscal_year !== b.fiscal_year) {
+        return a.fiscal_year - b.fiscal_year;
+      }
+      return a.quarter - b.quarter;
+    });
+
+  console.log('Filtered and sorted quarterly data:', dataWithRevenue);
+  console.log('Number of valid quarterly data points:', dataWithRevenue.length);
 
   return (
     <div className="space-y-6">
       <BarChart
         data={dataWithRevenue}
-        title="Quarterly Revenue (Billions USD)"
+        title={`Quarterly Revenue for ${symbol} (Billions USD)`}
         dataKey="revenue"
         height={400}
         color="#0891b2"

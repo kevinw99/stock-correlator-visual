@@ -17,13 +17,13 @@ export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb"
     const formatted = {
       ...item,
       revenue: item.revenue ? Number((item.revenue / 1000000000).toFixed(2)) : null,
-      reportType: `Q${item.quarter} ${item.fiscal_year}`
+      label: `Q${item.quarter} ${item.fiscal_year}`
     };
     console.log('Formatted item:', formatted);
     return formatted;
   });
 
-  console.log('Final formatted data:', formattedData);
+  console.log('Final formatted data for chart:', formattedData);
 
   return (
     <Card className="p-4">
@@ -31,15 +31,7 @@ export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb"
       <ResponsiveContainer width="100%" height={height}>
         <RechartsBarChart data={formattedData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <XAxis 
-            dataKey={item => item.announcement_date || item.date}
-            tickFormatter={(value) => {
-              const date = new Date(value);
-              return `${date.toLocaleDateString('en-US', { 
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-              })}`;
-            }}
+            dataKey="label"
             angle={-45}
             textAnchor="end"
             height={60}
@@ -55,21 +47,7 @@ export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb"
               borderRadius: '8px',
               padding: '8px'
             }}
-            labelFormatter={(value) => {
-              const date = new Date(value);
-              return `Report Date: ${date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}`;
-            }}
-            formatter={(value: number, name: string, props: any) => {
-              const item = props.payload;
-              return [
-                `$${value.toFixed(2)}B`, 
-                `Revenue (${item.reportType})`
-              ];
-            }}
+            formatter={(value: number) => [`$${value.toFixed(2)}B`, 'Revenue']}
           />
           <Bar
             dataKey={dataKey}
