@@ -27,11 +27,13 @@ export const FundamentalCharts = ({ data, symbol }: FundamentalChartsProps) => {
     })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Get the full date range from price data
+  // Get the full date range from price data, making sure to sort it first
   const dateRange = data.priceData ? {
-    start: new Date(data.priceData[0].date),
-    end: new Date(data.priceData[data.priceData.length - 1].date)
+    start: new Date(Math.min(...data.priceData.map(d => new Date(d.date).getTime()))),
+    end: new Date(Math.max(...data.priceData.map(d => new Date(d.date).getTime())))
   } : null;
+
+  console.log('Calculated date range:', dateRange);
 
   const formattedData = quarterlyData.map(item => ({
     ...item,
