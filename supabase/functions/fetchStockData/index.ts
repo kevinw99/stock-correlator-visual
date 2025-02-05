@@ -13,7 +13,6 @@ function getDateYearsAgo(years: number): string {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -31,11 +30,10 @@ serve(async (req) => {
       throw new Error('Symbol is required');
     }
 
-    // Format symbol for Tiingo (uppercase and trim)
     const formattedSymbol = symbol.trim().toUpperCase();
     console.log(`Processing request for symbol: ${formattedSymbol}`);
 
-    // Fetch daily price data from Tiingo
+    // 获取价格数据
     const startDate = getDateYearsAgo(5);
     const priceUrl = `https://api.tiingo.com/tiingo/daily/${formattedSymbol}/prices?startDate=${startDate}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching price data for ${formattedSymbol}...`);
@@ -52,57 +50,41 @@ serve(async (req) => {
       throw new Error(`No price data available for ${formattedSymbol}`);
     }
 
-    console.log(`Successfully fetched price data for ${formattedSymbol}:`, {
-      dataPoints: priceData.length
-    });
-
-    // Process the price data first
-    const combinedData = priceData.map((pricePoint: any) => ({
-      date: pricePoint.date.split('T')[0],
-      price: pricePoint.adjClose || pricePoint.close,
-      revenue: null,
-      margin: null
-    }));
-
-    try {
-      // Attempt to fetch fundamentals data, but don't fail if unavailable
-      const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?token=${TIINGO_API_KEY}`;
-      console.log(`Attempting to fetch fundamentals data for ${formattedSymbol}...`);
-      
-      const fundamentalsResponse = await fetch(fundamentalsUrl);
-      if (fundamentalsResponse.ok) {
-        const fundamentalsData = await fundamentalsResponse.json();
-        console.log(`Successfully fetched fundamentals data for ${formattedSymbol}:`, {
-          quarters: fundamentalsData?.length || 0
-        });
-
-        // Merge fundamentals data if available
-        if (Array.isArray(fundamentalsData) && fundamentalsData.length > 0) {
-          combinedData.forEach((dataPoint, index) => {
-            const matchingFundamentals = fundamentalsData.find(
-              (f: any) => f.date.split('T')[0] === dataPoint.date
-            );
-            if (matchingFundamentals) {
-              combinedData[index].revenue = matchingFundamentals.quarterlyRevenue || null;
-              combinedData[index].margin = matchingFundamentals.grossMargin ? 
-                parseFloat(matchingFundamentals.grossMargin) * 100 : null;
-            }
-          });
-        }
-      } else {
-        console.log(`Fundamentals data not available for ${formattedSymbol} (status: ${fundamentalsResponse.status})`);
-      }
-    } catch (fundamentalsError) {
-      console.error(`Error fetching fundamentals for ${formattedSymbol}:`, fundamentalsError);
-      // Continue without fundamentals data
+    // 获取基本面数据
+    const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?token=${TIINGO_API_KEY}`;
+    console.log(`Fetching fundamentals data for ${formattedSymbol}...`);
+    
+    const fundamentalsResponse = await fetch(fundamentalsUrl);
+    let fundamentalsData = [];
+    
+    if (fundamentalsResponse.ok) {
+      fundamentalsData = await fundamentalsResponse.json();
+      console.log(`Successfully fetched fundamentals data for ${formattedSymbol}:`, {
+        dataPoints: fundamentalsData.length
+      });
+    } else {
+      console.warn(`No fundamentals data available for ${formattedSymbol}`);
     }
 
-    // Sort data by date in ascending order
-    const sortedData = combinedData.sort((a: any, b: any) => 
+    // 合并数据
+    const combinedData = priceData.map(pricePoint => {
+      const priceDate = pricePoint.date.split('T')[0];
+      const fundamentals = fundamentalsData.find(f => f.date.split('T')[0] === priceDate);
+      
+      return {
+        date: priceDate,
+        price: pricePoint.adjClose || pricePoint.close,
+        revenue: fundamentals?.quarterlyRevenue || null,
+        margin: fundamentals?.grossMargin ? parseFloat(fundamentals.grossMargin) * 100 : null
+      };
+    });
+
+    // 按日期排序
+    const sortedData = combinedData.sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Store the data in Supabase
+    // 存储到 Supabase
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
