@@ -36,11 +36,11 @@ serve(async (req) => {
     // Fetch price data
     const startDate = getDateYearsAgo(5);
     const priceUrl = `https://api.tiingo.com/tiingo/daily/${formattedSymbol}/prices?startDate=${startDate}&token=${TIINGO_API_KEY}`;
-    console.log(`Fetching price data for ${formattedSymbol}...`);
+    console.log(`Fetching price data...`);
     
     const priceResponse = await fetch(priceUrl);
     if (!priceResponse.ok) {
-      console.error(`Price API error for ${formattedSymbol}:`, priceResponse.status, await priceResponse.text());
+      console.error(`Price API error for ${formattedSymbol}:`, priceResponse.status);
       throw new Error(`Invalid stock symbol or API error: ${formattedSymbol}`);
     }
     
@@ -50,29 +50,28 @@ serve(async (req) => {
       throw new Error(`No price data available for ${formattedSymbol}`);
     }
 
-    // Fetch fundamentals data
+    // Fetch fundamentals data using the correct endpoint
     const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?token=${TIINGO_API_KEY}`;
-    console.log(`Fetching fundamentals data for ${formattedSymbol}...`);
+    console.log(`Fetching fundamentals data...`);
     
     const fundamentalsResponse = await fetch(fundamentalsUrl);
     let fundamentalsData = [];
     
     if (fundamentalsResponse.ok) {
       const rawFundamentals = await fundamentalsResponse.json();
-      console.log('Raw fundamentals response:', {
+      console.log('Fundamentals data received:', {
         status: fundamentalsResponse.status,
-        dataLength: rawFundamentals.length,
-        sampleData: rawFundamentals[0]
+        dataLength: rawFundamentals.length
       });
       
       // Process fundamentals data
       fundamentalsData = rawFundamentals.map(item => ({
         date: item.date,
-        revenue: item.totalRevenue || item.quarterlyRevenue || null,
-        margin: item.grossMargin ? parseFloat(item.grossMargin) * 100 : null
+        revenue: item.totalRevenue || null,
+        margin: item.grossMargin || null
       }));
       
-      console.log('Processed fundamentals:', {
+      console.log('Processed fundamentals data:', {
         totalRecords: fundamentalsData.length,
         sample: fundamentalsData[0]
       });
@@ -104,17 +103,6 @@ serve(async (req) => {
     const sortedData = combinedData.sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
-
-    console.log(`Combined data summary for ${formattedSymbol}:`, {
-      totalRecords: sortedData.length,
-      recordsWithRevenue: sortedData.filter(d => d.revenue !== null).length,
-      recordsWithMargin: sortedData.filter(d => d.margin !== null).length,
-      dateRange: {
-        start: sortedData[0]?.date,
-        end: sortedData[sortedData.length - 1]?.date
-      },
-      fundamentalsSample: fundamentalsData[0]
-    });
 
     // Store in Supabase
     const supabaseClient = createClient(
