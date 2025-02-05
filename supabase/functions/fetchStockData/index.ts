@@ -12,17 +12,6 @@ function getDateYearsAgo(years: number): string {
   return date.toISOString().split('T')[0];
 }
 
-// Helper function to extract quarter from date
-function getQuarterFromDate(date: string): number {
-  const month = new Date(date).getMonth() + 1;
-  return Math.ceil(month / 3);
-}
-
-// Helper function to extract fiscal year from date
-function getFiscalYear(date: string): number {
-  return new Date(date).getFullYear();
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -90,11 +79,17 @@ serve(async (req) => {
       throw new Error('Failed to store price data');
     }
 
-    // Store fundamental data with quarter and fiscal year
+    // Store fundamental data
     if (Array.isArray(fundamentalsData) && fundamentalsData.length > 0) {
       console.log(`Processing ${fundamentalsData.length} fundamental data records for ${formattedSymbol}`);
       
       for (const item of fundamentalsData) {
+        // Only process items that have quarter information (exclude annual reports)
+        if (!item.quarter || item.quarter === 0) {
+          console.log(`Skipping non-quarterly report for ${formattedSymbol} on ${item.date}`);
+          continue;
+        }
+
         const incomeStatement = item.statementData?.incomeStatement || [];
         const overview = item.statementData?.overview || [];
 
@@ -108,16 +103,12 @@ serve(async (req) => {
           ? grossMarginItem.value * 100
           : (revenue && grossProfit ? (grossProfit / revenue) * 100 : null);
 
-        // Extract quarter and fiscal year from the date
-        const quarter = getQuarterFromDate(item.date);
-        const fiscal_year = getFiscalYear(item.date);
-
         console.log(`Processing fundamental data for ${formattedSymbol} on ${item.date}:`, {
           revenue,
           grossProfit,
           grossMargin,
-          quarter,
-          fiscal_year
+          quarter: item.quarter,
+          fiscal_year: item.year
         });
 
         try {
@@ -129,8 +120,8 @@ serve(async (req) => {
               revenue,
               gross_profit: grossProfit,
               gross_margin: grossMargin,
-              quarter,
-              fiscal_year,
+              quarter: item.quarter,
+              fiscal_year: item.year,
               announcement_date: item.date
             }, {
               onConflict: 'symbol,date'
