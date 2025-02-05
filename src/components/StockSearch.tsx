@@ -15,13 +15,14 @@ import { cn } from "@/lib/utils";
 
 interface StockSearchProps {
   onSearch: (symbol: string) => void;
+  initialSymbol?: string;
 }
 
 const HISTORY_KEY = "stockSearchHistory";
 const MAX_HISTORY_ITEMS = 5;
 
-export const StockSearch = ({ onSearch }: StockSearchProps) => {
-  const [symbol, setSymbol] = useState("");
+export const StockSearch = ({ onSearch, initialSymbol = '' }: StockSearchProps) => {
+  const [symbol, setSymbol] = useState(initialSymbol);
   const [open, setOpen] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
@@ -32,6 +33,13 @@ export const StockSearch = ({ onSearch }: StockSearchProps) => {
       setSearchHistory(JSON.parse(savedHistory));
     }
   }, []);
+
+  // Update symbol when initialSymbol changes
+  useEffect(() => {
+    if (initialSymbol) {
+      setSymbol(initialSymbol);
+    }
+  }, [initialSymbol]);
 
   const updateSearchHistory = (newSymbol: string) => {
     const updatedHistory = [

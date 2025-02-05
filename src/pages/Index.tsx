@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { StockChart } from "@/components/StockChart";
 import { StockSearch } from "@/components/StockSearch";
 import { useQuery } from "@tanstack/react-query";
@@ -6,10 +6,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { FundamentalCharts } from "@/components/FundamentalCharts";
+import { useSearchParams } from "react-router-dom";
 
 const Index = () => {
-  const [currentSymbol, setCurrentSymbol] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTimestamp, setSearchTimestamp] = useState<number>(Date.now());
+  
+  // Get symbol from URL params instead of state
+  const currentSymbol = searchParams.get('symbol');
 
   // Add queries to check both tables
   const { data: fundamentalCheck } = useQuery({
@@ -67,7 +71,8 @@ const Index = () => {
 
   const handleSearch = (symbol: string) => {
     console.log("Searching for symbol:", symbol);
-    setCurrentSymbol(symbol);
+    // Update URL with new symbol
+    setSearchParams({ symbol: symbol });
     setSearchTimestamp(Date.now());
   };
 
@@ -76,7 +81,7 @@ const Index = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm">
           <h1 className="text-2xl font-bold text-gray-900">Stock Analysis Dashboard</h1>
-          <StockSearch onSearch={handleSearch} />
+          <StockSearch onSearch={handleSearch} initialSymbol={currentSymbol || ''} />
         </div>
 
         {fundamentalCheck && fundamentalCheck.length > 0 && (
