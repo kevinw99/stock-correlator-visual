@@ -13,7 +13,8 @@ export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb"
   // Format revenue values to billions
   const formattedData = data.map(item => ({
     ...item,
-    revenue: item.revenue ? Number((item.revenue / 1000000000).toFixed(2)) : null
+    revenue: item.revenue ? Number((item.revenue / 1000000000).toFixed(2)) : null,
+    reportType: item.quarter === 0 ? 'Annual Report' : `Q${item.quarter} ${item.fiscal_year}`
   }));
 
   return (
@@ -54,7 +55,13 @@ export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb"
                 day: 'numeric'
               })}`;
             }}
-            formatter={(value: number) => [`$${value.toFixed(2)}B`, 'Revenue']}
+            formatter={(value: number, name: string, props: any) => {
+              const item = props.payload;
+              return [
+                `$${value.toFixed(2)}B`, 
+                `Revenue (${item.reportType})`
+              ];
+            }}
           />
           <Bar
             dataKey={dataKey}

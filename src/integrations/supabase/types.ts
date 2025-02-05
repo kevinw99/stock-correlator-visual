@@ -14,9 +14,11 @@ export type Database = {
           announcement_date: string | null
           created_at: string | null
           date: string
+          fiscal_year: number | null
           gross_margin: number | null
           gross_profit: number | null
           id: number
+          quarter: number | null
           revenue: number | null
           symbol: string
         }
@@ -24,9 +26,11 @@ export type Database = {
           announcement_date?: string | null
           created_at?: string | null
           date: string
+          fiscal_year?: number | null
           gross_margin?: number | null
           gross_profit?: number | null
           id?: number
+          quarter?: number | null
           revenue?: number | null
           symbol: string
         }
@@ -34,9 +38,11 @@ export type Database = {
           announcement_date?: string | null
           created_at?: string | null
           date?: string
+          fiscal_year?: number | null
           gross_margin?: number | null
           gross_profit?: number | null
           id?: number
+          quarter?: number | null
           revenue?: number | null
           symbol?: string
         }
