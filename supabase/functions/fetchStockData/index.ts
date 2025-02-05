@@ -59,7 +59,7 @@ serve(async (req) => {
     const fundamentalsResponse = await fetch(fundamentalsUrl);
     const fundamentalsData = await fundamentalsResponse.json();
     
-    console.log('Fundamentals data received:', fundamentalsData);
+    console.log(`Received fundamentals data for ${formattedSymbol}:`, JSON.stringify(fundamentalsData).slice(0, 200) + '...');
 
     // Store price data
     const priceDataToStore = priceData.map((price: any) => ({
@@ -81,6 +81,8 @@ serve(async (req) => {
 
     // Store fundamental data
     if (Array.isArray(fundamentalsData) && fundamentalsData.length > 0) {
+      console.log(`Processing ${fundamentalsData.length} fundamental data records for ${formattedSymbol}`);
+      
       // Process fundamentals data one by one to avoid duplicate conflicts
       for (const item of fundamentalsData) {
         const incomeStatement = item.statementData?.incomeStatement || [];
@@ -96,31 +98,41 @@ serve(async (req) => {
           ? grossMarginItem.value * 100
           : (revenue && grossProfit ? (grossProfit / revenue) * 100 : null);
 
-        console.log('Processing fundamental data:', {
-          date: item.date,
+        console.log(`Processing fundamental data for ${formattedSymbol} on ${item.date}:`, {
           revenue,
           grossProfit,
           grossMargin
         });
 
-        const { error: fundamentalError } = await supabaseClient
-          .from('fundamental_data')
-          .upsert({
-            symbol: formattedSymbol,
-            date: item.date,
-            revenue,
-            gross_profit: grossProfit,
-            gross_margin: grossMargin
-          }, {
-            onConflict: 'symbol,date'
-          });
+        try {
+          const { error: fundamentalError } = await supabaseClient
+            .from('fundamental_data')
+            .upsert({
+              symbol: formattedSymbol,
+              date: item.date,
+              revenue,
+              gross_profit: grossProfit,
+              gross_margin: grossMargin
+            }, {
+              onConflict: 'symbol,date'
+            });
 
-        if (fundamentalError) {
-          console.error('Error storing fundamental data:', fundamentalError);
-          console.error('Failed item:', item);
-          throw fundamentalError;
+          if (fundamentalError) {
+            console.error(`Error storing fundamental data for ${formattedSymbol} on ${item.date}:`, fundamentalError);
+            console.error('Failed item:', item);
+            // Continue processing other items instead of throwing
+            continue;
+          }
+
+          console.log(`Successfully stored fundamental data for ${formattedSymbol} on ${item.date}`);
+        } catch (error) {
+          console.error(`Unexpected error storing fundamental data for ${formattedSymbol} on ${item.date}:`, error);
+          // Continue processing other items
+          continue;
         }
       }
+    } else {
+      console.log(`No fundamental data available for ${formattedSymbol}`);
     }
 
     // Fetch combined data for response
