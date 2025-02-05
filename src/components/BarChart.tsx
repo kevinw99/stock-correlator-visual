@@ -14,7 +14,7 @@ export const BarChart = ({ data, title, dataKey, height = 300, color = "#2563eb"
   const formattedData = data.map(item => ({
     ...item,
     revenue: item.revenue ? Number((item.revenue / 1000000000).toFixed(2)) : null,
-    reportType: item.quarter === 0 ? 'Annual Report' : `Q${item.quarter} ${item.fiscal_year}`
+    reportType: `Q${item.quarter} ${item.fiscal_year}`
   }));
 
   return (
