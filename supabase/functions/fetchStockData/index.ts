@@ -12,6 +12,17 @@ function getDateYearsAgo(years: number): string {
   return date.toISOString().split('T')[0];
 }
 
+// Helper function to extract quarter from date
+function getQuarterFromDate(date: string): number {
+  const month = new Date(date).getMonth() + 1;
+  return Math.ceil(month / 3);
+}
+
+// Helper function to extract fiscal year from date
+function getFiscalYear(date: string): number {
+  return new Date(date).getFullYear();
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -52,7 +63,7 @@ serve(async (req) => {
     
     const priceData = await priceResponse.json();
 
-    // Fetch fundamentals data - now also using 10 years
+    // Fetch fundamentals data
     const fundamentalsUrl = `https://api.tiingo.com/tiingo/fundamentals/${formattedSymbol}/statements?startDate=${startDate}&token=${TIINGO_API_KEY}`;
     console.log(`Fetching fundamentals data from URL: ${fundamentalsUrl.replace(TIINGO_API_KEY, 'HIDDEN')}`);
     
@@ -79,11 +90,10 @@ serve(async (req) => {
       throw new Error('Failed to store price data');
     }
 
-    // Store fundamental data
+    // Store fundamental data with quarter and fiscal year
     if (Array.isArray(fundamentalsData) && fundamentalsData.length > 0) {
       console.log(`Processing ${fundamentalsData.length} fundamental data records for ${formattedSymbol}`);
       
-      // Process fundamentals data one by one to avoid duplicate conflicts
       for (const item of fundamentalsData) {
         const incomeStatement = item.statementData?.incomeStatement || [];
         const overview = item.statementData?.overview || [];
@@ -98,10 +108,16 @@ serve(async (req) => {
           ? grossMarginItem.value * 100
           : (revenue && grossProfit ? (grossProfit / revenue) * 100 : null);
 
+        // Extract quarter and fiscal year from the date
+        const quarter = getQuarterFromDate(item.date);
+        const fiscal_year = getFiscalYear(item.date);
+
         console.log(`Processing fundamental data for ${formattedSymbol} on ${item.date}:`, {
           revenue,
           grossProfit,
-          grossMargin
+          grossMargin,
+          quarter,
+          fiscal_year
         });
 
         try {
@@ -112,7 +128,10 @@ serve(async (req) => {
               date: item.date,
               revenue,
               gross_profit: grossProfit,
-              gross_margin: grossMargin
+              gross_margin: grossMargin,
+              quarter,
+              fiscal_year,
+              announcement_date: item.date
             }, {
               onConflict: 'symbol,date'
             });
@@ -120,14 +139,12 @@ serve(async (req) => {
           if (fundamentalError) {
             console.error(`Error storing fundamental data for ${formattedSymbol} on ${item.date}:`, fundamentalError);
             console.error('Failed item:', item);
-            // Continue processing other items instead of throwing
             continue;
           }
 
           console.log(`Successfully stored fundamental data for ${formattedSymbol} on ${item.date}`);
         } catch (error) {
           console.error(`Unexpected error storing fundamental data for ${formattedSymbol} on ${item.date}:`, error);
-          // Continue processing other items
           continue;
         }
       }
@@ -161,7 +178,9 @@ serve(async (req) => {
       return {
         ...price,
         revenue: fundamental?.revenue || null,
-        margin: fundamental?.gross_margin || null
+        margin: fundamental?.gross_margin || null,
+        quarter: fundamental?.quarter || null,
+        fiscal_year: fundamental?.fiscal_year || null
       };
     });
 
