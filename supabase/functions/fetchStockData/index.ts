@@ -58,17 +58,27 @@ serve(async (req) => {
     let fundamentalsData = [];
     
     if (fundamentalsResponse.ok) {
-      fundamentalsData = await fundamentalsResponse.json();
-      console.log(`Successfully fetched fundamentals data for ${formattedSymbol}:`, {
-        dataPoints: fundamentalsData.length,
-        sample: fundamentalsData[0] ? {
-          date: fundamentalsData[0].date,
-          revenue: fundamentalsData[0].quarterlyRevenue,
-          margin: fundamentalsData[0].grossMargin
-        } : null
+      const rawFundamentals = await fundamentalsResponse.json();
+      console.log('Raw fundamentals response:', {
+        status: fundamentalsResponse.status,
+        dataLength: rawFundamentals.length,
+        sampleData: rawFundamentals[0]
+      });
+      
+      // Process fundamentals data
+      fundamentalsData = rawFundamentals.map(item => ({
+        date: item.date,
+        revenue: item.totalRevenue || item.quarterlyRevenue || null,
+        margin: item.grossMargin ? parseFloat(item.grossMargin) * 100 : null
+      }));
+      
+      console.log('Processed fundamentals:', {
+        totalRecords: fundamentalsData.length,
+        sample: fundamentalsData[0]
       });
     } else {
-      console.warn(`No fundamentals data available for ${formattedSymbol}`);
+      console.warn(`No fundamentals data available for ${formattedSymbol}:`, 
+        await fundamentalsResponse.text());
     }
 
     // Create a map of fundamentals data by date for easier lookup
@@ -84,8 +94,8 @@ serve(async (req) => {
       return {
         date: priceDate,
         price: pricePoint.adjClose || pricePoint.close,
-        revenue: fundamentals?.quarterlyRevenue || null,
-        margin: fundamentals?.grossMargin ? parseFloat(fundamentals.grossMargin) * 100 : null,
+        revenue: fundamentals?.revenue || null,
+        margin: fundamentals?.margin || null,
         symbol: formattedSymbol
       };
     });
@@ -102,10 +112,11 @@ serve(async (req) => {
       dateRange: {
         start: sortedData[0]?.date,
         end: sortedData[sortedData.length - 1]?.date
-      }
+      },
+      fundamentalsSample: fundamentalsData[0]
     });
 
-    // Store in Supabase using upsert
+    // Store in Supabase
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
