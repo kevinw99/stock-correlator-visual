@@ -34,29 +34,7 @@ const Index = () => {
       if (!currentSymbol) return null;
       console.log('Fetching data for symbol:', currentSymbol, 'at timestamp:', searchTimestamp);
 
-      // First check if we have recent data in both tables
-      const { data: existingPriceData, error: priceError } = await supabase
-        .from('stock_data')
-        .select('*')
-        .eq('symbol', currentSymbol)
-        .order('date', { ascending: true });
-
-      const { data: existingFundamentalData, error: fundamentalError } = await supabase
-        .from('fundamental_data')
-        .select('*')
-        .eq('symbol', currentSymbol)
-        .order('date', { ascending: true });
-
-      if (priceError || fundamentalError) throw (priceError || fundamentalError);
-
-      console.log('Existing fundamental data:', existingFundamentalData);
-      console.log('Existing price data:', existingPriceData);
-
-      if (existingFundamentalData && existingFundamentalData.length > 0) {
-        console.log('Using existing fundamental data');
-        return existingFundamentalData;
-      }
-
+      // Always fetch fresh data from API
       console.log('Fetching fresh data from API');
       const response = await supabase.functions.invoke('fetchStockData', {
         body: { symbol: currentSymbol }
