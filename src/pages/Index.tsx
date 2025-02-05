@@ -49,6 +49,9 @@ const Index = () => {
 
       if (priceError || fundamentalError) throw (priceError || fundamentalError);
 
+      console.log('Existing fundamental data:', existingFundamentalData);
+      console.log('Existing price data:', existingPriceData);
+
       if (existingPriceData && existingPriceData.length > 0) {
         const latestDate = new Date(existingPriceData[existingPriceData.length - 1].date);
         const isRecent = (Date.now() - latestDate.getTime()) < 24 * 60 * 60 * 1000;
@@ -56,7 +59,7 @@ const Index = () => {
         if (isRecent) {
           console.log('Using cached data from Supabase');
           // Combine the data
-          return existingPriceData.map(price => {
+          const combinedData = existingPriceData.map(price => {
             const fundamental = existingFundamentalData?.find(
               f => f.date.split('T')[0] === price.date.split('T')[0]
             );
@@ -66,6 +69,8 @@ const Index = () => {
               margin: fundamental?.gross_margin || null
             };
           });
+          console.log('Combined data:', combinedData);
+          return combinedData;
         }
       }
 
@@ -75,6 +80,7 @@ const Index = () => {
       });
 
       if (response.error) throw new Error(response.error.message);
+      console.log('API response data:', response.data);
       return response.data;
     },
     enabled: !!currentSymbol
