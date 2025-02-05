@@ -33,17 +33,19 @@ export const BarChart = ({
   
   // Format revenue values to billions or millions
   const formattedData = data.map(item => {
-    const revenue = Number(item[dataKey]);
+    const revenue = Number(item.revenue);
     
     // Use billions if revenue is over 1B, otherwise use millions
     const divisor = revenue >= 1000000000 ? 1000000000 : 1000000;
     const unitLabel = revenue >= 1000000000 ? 'B' : 'M';
     
-    return {
+    const formatted = {
       ...item,
-      [dataKey]: revenue ? Number((revenue / divisor).toFixed(2)) : null,
-      date: new Date(item.date)
+      revenue: revenue ? Number((revenue / divisor).toFixed(2)) : null,
+      date: new Date(item.date),
+      announcement_date: item.announcement_date ? new Date(item.announcement_date) : null
     };
+    return formatted;
   });
 
   // Use the global date range for the domain if provided, otherwise use the local date range
@@ -52,8 +54,8 @@ export const BarChart = ({
     dateRange ? 
       [dateRange.start.getTime(), dateRange.end.getTime()] :
       [
-        Math.min(...formattedData.map(d => d.date.getTime())),
-        Math.max(...formattedData.map(d => d.date.getTime()))
+        Math.min(...formattedData.map(d => new Date(d.date).getTime())),
+        Math.max(...formattedData.map(d => new Date(d.date).getTime()))
       ];
   
   console.log('Calculated X-axis domain:', domain);
