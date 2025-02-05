@@ -64,26 +64,47 @@ serve(async (req) => {
     
     if (fundamentalsResponse.ok) {
       const rawFundamentals = await fundamentalsResponse.json();
-      console.log('Raw fundamentals data structure:', JSON.stringify(rawFundamentals[0], null, 2));
+      console.log('Raw fundamentals first record:', {
+        date: rawFundamentals[0]?.date,
+        hasStatementData: !!rawFundamentals[0]?.statementData,
+        hasIncomeStatement: !!rawFundamentals[0]?.statementData?.incomeStatement,
+        hasOverview: !!rawFundamentals[0]?.statementData?.overview
+      });
       
       // Process fundamentals data with the correct structure
       fundamentalsData = rawFundamentals.map(item => {
-        // Find revenue in statementData
         const incomeStatement = item.statementData?.incomeStatement || [];
-        const revenue = incomeStatement.find(entry => entry.dataCode === 'totalRevenue')?.value || null;
+        const overview = item.statementData?.overview || [];
+
+        // Find revenue and gross profit in income statement
+        const revenueItem = incomeStatement.find(entry => entry.dataCode === 'revenue');
+        const grossProfitItem = incomeStatement.find(entry => entry.dataCode === 'grossProfit');
         
-        // Calculate margin if we have both revenue and gross profit
-        const grossProfit = incomeStatement.find(entry => entry.dataCode === 'grossProfit')?.value || null;
-        const margin = revenue && grossProfit ? (grossProfit / revenue) * 100 : null;
+        // Find gross margin in overview
+        const grossMarginItem = overview.find(entry => entry.dataCode === 'grossMargin');
+        
+        // Extract values
+        const revenue = revenueItem?.value || null;
+        const grossProfit = grossProfitItem?.value || null;
+        const grossMargin = grossMarginItem?.value 
+          ? grossMarginItem.value * 100  // Convert from decimal to percentage
+          : (revenue && grossProfit ? (grossProfit / revenue) * 100 : null);
+
+        console.log('Processing statement:', {
+          date: item.date,
+          revenue,
+          grossProfit,
+          grossMargin
+        });
         
         return {
           date: item.date,
           revenue,
-          margin
+          margin: grossMargin
         };
       });
       
-      console.log('Processed fundamentals data:', {
+      console.log('Processed fundamentals summary:', {
         totalRecords: fundamentalsData.length,
         sample: fundamentalsData[0],
         sampleRevenue: fundamentalsData[0]?.revenue,
@@ -123,6 +144,10 @@ serve(async (req) => {
       totalRecords: sortedData.length,
       recordsWithRevenue: sortedData.filter(d => d.revenue !== null).length,
       recordsWithMargin: sortedData.filter(d => d.margin !== null).length,
+      dateRange: {
+        start: sortedData[0]?.date,
+        end: sortedData[sortedData.length - 1]?.date
+      },
       sampleRecord: sortedData[0]
     });
 
