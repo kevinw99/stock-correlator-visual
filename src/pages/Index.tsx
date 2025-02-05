@@ -36,13 +36,11 @@ const Index = () => {
 
       // Get weekly price data using SQL query
       const { data: priceData, error: priceError } = await supabase
-        .from('stock_data')
-        .select('*')
-        .eq('symbol', currentSymbol)
-        .filter('date', 'gte', '2015-01-01')
-        .filter('date', 'lte', '2025-12-31')
-        .or('date.eq.date_trunc(\'week\', date)')  // Get only the first day of each week
-        .order('date', { ascending: true });
+        .rpc('get_weekly_stock_data', {
+          p_symbol: currentSymbol,
+          start_date: '2015-01-01',
+          end_date: '2025-12-31'
+        });
 
       if (priceError) throw priceError;
       
