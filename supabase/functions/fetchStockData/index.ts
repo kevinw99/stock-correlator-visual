@@ -16,6 +16,10 @@ serve(async (req) => {
     const { symbol } = await req.json();
     console.log('Fetching data for symbol:', symbol);
 
+    if (!symbol) {
+      throw new Error('Symbol is required');
+    }
+
     const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
     if (!FMP_API_KEY) {
       throw new Error('FMP_API_KEY not configured');
@@ -23,16 +27,26 @@ serve(async (req) => {
 
     // Fetch 5 years of historical price data
     const priceUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${symbol}?from=${getDateYearsAgo(5)}&apikey=${FMP_API_KEY}`;
+    console.log('Fetching price data from:', priceUrl);
     const priceResponse = await fetch(priceUrl);
     const priceData = await priceResponse.json();
 
+    // Check if price data is valid
+    if (!priceData.historical || priceData.historical.length === 0) {
+      console.error('No price data found for symbol:', symbol);
+      throw new Error(`No price data available for symbol: ${symbol}`);
+    }
+
     // Fetch quarterly income statements for revenue data
     const incomeUrl = `https://financialmodelingprep.com/api/v3/income-statement/${symbol}?period=quarter&limit=20&apikey=${FMP_API_KEY}`;
+    console.log('Fetching income data from:', incomeUrl);
     const incomeResponse = await fetch(incomeUrl);
     const incomeData = await incomeResponse.json();
 
-    if (!priceData.historical || !incomeData.length) {
-      throw new Error('No data available for this symbol');
+    // Check if income data is valid
+    if (!Array.isArray(incomeData) || incomeData.length === 0) {
+      console.error('No income data found for symbol:', symbol);
+      throw new Error(`No income data available for symbol: ${symbol}`);
     }
 
     // Process and combine the data
@@ -62,6 +76,7 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('Storing data for symbol:', symbol);
 
     // Insert data into the database
     for (const data of processedData) {
@@ -86,9 +101,13 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    console.error('Error in fetchStockData:', error.message);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message,
+        details: 'Please ensure the stock symbol is valid and try again.'
+      }), {
+      status: 400, // Changed from 500 to 400 for invalid input
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
